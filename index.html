@@ -1045,7 +1045,8 @@ function renderConsolidation() {
   if (keys.length === 0) {
     container.innerHTML = '<p class="empty">No data yet. Add daily entries to see consolidation.</p>';
   } else {
-    var html = '<table class="tbl"><thead><tr><th>Period</th><th>LP Records</th><th>LP Cost</th><th>Versium Recs</th><th>Versium Cost</th><th>RM Records</th><th>RM Cost</th><th>Campaigns</th></tr></thead><tbody>';
+    // Build rows with WoW change tracking
+    var rowData = [];
     for (var i = 0; i < keys.length; i++) {
       var k = keys[i];
       var g = groups[k];
@@ -1055,6 +1056,9 @@ function renderConsolidation() {
       var lpC = (g.costByPlat && g.costByPlat['Land Portal']) || 0;
       var vC = (g.costByPlat && g.costByPlat['Versium']) || 0;
       var rmC = (g.costByPlat && g.costByPlat['Readymode']) || 0;
+      var totalCost = lpC + vC + rmC;
+      var cleanRecs = lpR - rmR; if (cleanRecs < 0) cleanRecs = 0;
+      var blended = cleanRecs > 0 ? totalCost / cleanRecs : 0;
       var campCount = Object.keys(g.byCamp).length;
 
       var label;
@@ -1064,14 +1068,43 @@ function renderConsolidation() {
       else if (S.period === 'yearly') label = k;
       else label = monthLabel(k);
 
-      html += '<tr><td><strong>' + label + '</strong></td>';
-      html += '<td>' + (lpR > 0 ? lpR.toLocaleString() : '<span class="muted">—</span>') + '</td>';
-      html += '<td>' + (lpC > 0 ? fmt(lpC) : '<span class="muted">—</span>') + '</td>';
-      html += '<td>' + (vR > 0 ? vR.toLocaleString() : '<span class="muted">—</span>') + '</td>';
-      html += '<td>' + (vC > 0 ? fmt(vC) : '<span class="muted">—</span>') + '</td>';
-      html += '<td>' + (rmR > 0 ? rmR.toLocaleString() : '<span class="muted">—</span>') + '</td>';
-      html += '<td>' + (rmC > 0 ? fmt(rmC) : '<span class="muted">—</span>') + '</td>';
-      html += '<td>' + campCount + '</td></tr>';
+      rowData.push({ label: label, lpR: lpR, lpC: lpC, vR: vR, vC: vC, rmR: rmR, rmC: rmC, totalCost: totalCost, cleanRecs: cleanRecs, blended: blended, campCount: campCount });
+    }
+
+    function wowBadge(curr, prev) {
+      if (!prev || prev === 0) return '';
+      var pct = ((curr - prev) / prev) * 100;
+      if (Math.abs(pct) < 0.5) return '';
+      var arrow = pct > 0 ? '&#x25B2;' : '&#x25BC;';
+      var color = pct > 0 ? '#2e7d32' : '#c62828';
+      return ' <span style="font-size:9px;color:' + color + '">' + arrow + Math.abs(pct).toFixed(1) + '%</span>';
+    }
+    function wowBadgeInv(curr, prev) {
+      // Inverted: lower is better (cost, blended)
+      if (!prev || prev === 0) return '';
+      var pct = ((curr - prev) / prev) * 100;
+      if (Math.abs(pct) < 0.5) return '';
+      var arrow = pct > 0 ? '&#x25B2;' : '&#x25BC;';
+      var color = pct < 0 ? '#2e7d32' : '#c62828';
+      return ' <span style="font-size:9px;color:' + color + '">' + arrow + Math.abs(pct).toFixed(1) + '%</span>';
+    }
+
+    var html = '<table class="tbl"><thead><tr><th>Period</th><th class="col-lp">LP Recs</th><th class="col-lp">LP Cost</th><th class="col-v">V Recs</th><th class="col-v">V Cost</th><th class="col-rm">RM Recs</th><th class="col-rm">RM Cost</th><th class="col-sum">Clean Recs</th><th class="col-sum">Total Cost</th><th class="col-sum">Blended $/Rec</th><th>Camps</th></tr></thead><tbody>';
+    for (var i = 0; i < rowData.length; i++) {
+      var r = rowData[i];
+      var prev = i < rowData.length - 1 ? rowData[i + 1] : null; // keys are reverse-sorted, so i+1 is the prior period
+      var d = '<span class="muted">—</span>';
+      html += '<tr><td><strong>' + r.label + '</strong></td>';
+      html += '<td class="lp-cell" style="text-align:right">' + (r.lpR > 0 ? r.lpR.toLocaleString() + wowBadge(r.lpR, prev ? prev.lpR : 0) : d) + '</td>';
+      html += '<td class="lp-cell" style="text-align:right">' + (r.lpC > 0 ? fmt(r.lpC) + wowBadgeInv(r.lpC, prev ? prev.lpC : 0) : d) + '</td>';
+      html += '<td class="v-cell" style="text-align:right">' + (r.vR > 0 ? r.vR.toLocaleString() + wowBadge(r.vR, prev ? prev.vR : 0) : d) + '</td>';
+      html += '<td class="v-cell" style="text-align:right">' + (r.vC > 0 ? fmt(r.vC) + wowBadgeInv(r.vC, prev ? prev.vC : 0) : d) + '</td>';
+      html += '<td class="rm-cell" style="text-align:right">' + (r.rmR > 0 ? r.rmR.toLocaleString() + wowBadgeInv(r.rmR, prev ? prev.rmR : 0) : d) + '</td>';
+      html += '<td class="rm-cell" style="text-align:right">' + (r.rmC > 0 ? fmt(r.rmC) + wowBadgeInv(r.rmC, prev ? prev.rmC : 0) : d) + '</td>';
+      html += '<td class="sum-cell" style="text-align:right">' + (r.cleanRecs > 0 ? r.cleanRecs.toLocaleString() + wowBadge(r.cleanRecs, prev ? prev.cleanRecs : 0) : d) + '</td>';
+      html += '<td class="sum-cell" style="text-align:right">' + (r.totalCost > 0 ? fmt(r.totalCost) + wowBadgeInv(r.totalCost, prev ? prev.totalCost : 0) : d) + '</td>';
+      html += '<td class="sum-cell" style="text-align:right">' + (r.blended > 0 ? '$' + r.blended.toFixed(4) + wowBadgeInv(r.blended, prev ? prev.blended : 0) : d) + '</td>';
+      html += '<td>' + r.campCount + '</td></tr>';
     }
     html += '</tbody></table>';
     container.innerHTML = html;
@@ -1421,59 +1454,4 @@ function renderOverview() {
     for (var i = 0; i < S.costs.length; i++) { allMonths[S.costs[i].month] = true; }
     var mKeys = Object.keys(allMonths).sort();
     var mSpend = {};
-    for (var i = 0; i < S.costs.length; i++) { mSpend[S.costs[i].month] = (mSpend[S.costs[i].month]||0) + S.costs[i].amt; }
-
-    CK.spend = new Chart(ctx1, {
-      type: 'bar', data: { labels: mKeys.map(monthLabel), datasets: [{ data: mKeys.map(function(m) { return mSpend[m]||0; }), backgroundColor: '#0f3d2e88', borderColor: '#0f3d2e', borderWidth: 1, borderRadius: 3 }] },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: function(v) { return '$'+v.toLocaleString(); } } } } }
-    });
-  }
-
-  // Cost share pie
-  destroyChart('share');
-  var ctx2 = $('shareChart');
-  if (ctx2) {
-    var labels2 = Object.keys(platSpend);
-    if (labels2.length > 0) {
-      CK.share = new Chart(ctx2, {
-        type: 'doughnut', data: { labels: labels2, datasets: [{ data: labels2.map(function(l) { return platSpend[l]; }), backgroundColor: ['#0f3d2e','#e8913a','#1a5c44','#d4a843'], borderWidth: 2, borderColor: '#fff' }] },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } }, tooltip: { callbacks: { label: function(ctx) { return ctx.label+': '+fmt(ctx.parsed); } } } } }
-      });
-    }
-  }
-}
-
-// ============================================================
-// TAB SWITCHING
-// ============================================================
-function switchTab(name, btn) {
-  var tabs = document.querySelectorAll('.tab');
-  for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
-  var contents = document.querySelectorAll('.tab-content');
-  for (var i = 0; i < contents.length; i++) contents[i].classList.remove('active');
-  $('tab-'+name).classList.add('active');
-  btn.classList.add('active');
-  setTimeout(function() {
-    if (name === 'consolidation') renderConsolidation();
-    if (name === 'campaigns') renderCampaignView();
-    if (name === 'costs') renderPlatformChart();
-    if (name === 'overview') renderOverview();
-  }, 50);
-}
-
-// ============================================================
-// INIT
-// ============================================================
-load(function() {
-  var el = document.getElementById('load-status');
-  if (el && S.daily.length > 0) {
-    el.textContent = 'Connected — ' + S.daily.length + ' entries, ' + S.costs.length + ' cost records loaded';
-    el.style.color = '#2e7d32';
-  } else if (el && S.daily.length === 0 && S.costs.length === 0) {
-    el.textContent = 'Connected — no data found. Add entries above.';
-  }
-  renderAll();
-});
-</script>
-</body>
-</ht
+    for (var i = 0; i < S.costs.length; i++) { mSpend[S.costs[i].month] = (mSpend[S.cos
