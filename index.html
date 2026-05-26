@@ -862,7 +862,7 @@ function addDaily() {
   var lp = parseInt($('d-lp').value) || 0;
   var v = parseInt($('d-v').value) || 0;
   var clean = parseInt($('d-rm').value) || 0;
-  var rm = lp - clean; if (rm < 0) rm = 0;
+  var rm = (lp + v) - clean; if (rm < 0) rm = 0;
   var by = $('d-by').value.trim();
   var notes = $('d-notes').value;
   if (!date || !camp) return alert('Enter date and campaign.');
@@ -934,7 +934,7 @@ function renderDailyTable() {
     var vAlloc = (mt.v > 0 && eV > 0) ? (eV / mt.v) * vCost : 0;
     var rmAlloc = (mt.rm > 0 && eRm > 0) ? (eRm / mt.rm) * rmCost : 0;
     var totalCost = lpAlloc + vAlloc + rmAlloc;
-    var cleanRecs = eLp - eRm;
+    var cleanRecs = (eLp + eV) - eRm;
     if (cleanRecs < 0) cleanRecs = 0;
     var blended = cleanRecs > 0 ? totalCost / cleanRecs : 0;
 
@@ -1105,7 +1105,7 @@ function renderConsolidation() {
       var vC = (g.costByPlat && g.costByPlat['Versium']) || 0;
       var rmC = (g.costByPlat && g.costByPlat['Readymode']) || 0;
       var totalCost = lpC + vC + rmC;
-      var cleanRecs = lpR - rmR; if (cleanRecs < 0) cleanRecs = 0;
+      var cleanRecs = (lpR + vR) - rmR; if (cleanRecs < 0) cleanRecs = 0;
       var blended = cleanRecs > 0 ? totalCost / cleanRecs : 0;
       var campCount = Object.keys(g.byCamp).length;
 
@@ -1278,8 +1278,8 @@ function renderCampaignView() {
     var rmAlloc = (platTotalRecs['Readymode'] > 0 && rmR > 0) ? (rmR / platTotalRecs['Readymode']) * rmCostTotal : 0;
     var totalCost = lpAlloc + vAlloc + rmAlloc;
 
-    // Clean records = LP - RM
-    var cleanRecs = lpR - rmR;
+    // Clean records = (LP + V) - RM scrubbed
+    var cleanRecs = (lpR + vR) - rmR;
     if (cleanRecs < 0) cleanRecs = 0;
 
     // Blended $/rec
@@ -1433,7 +1433,7 @@ function renderEffChart(platTotalRecs, lpCost, vCost, rmCost, combinedCost, tota
   if (platTotalRecs['Readymode'] > 0 && rmCost > 0)
     effData.push({ name: 'Readymode', cpr: rmCost / platTotalRecs['Readymode'], color: '#e8913a' });
 
-  var cleanRecs = totalLP - (platTotalRecs['Readymode'] || 0);
+  var cleanRecs = totalLP + (platTotalRecs['Versium'] || 0) - (platTotalRecs['Readymode'] || 0);
   if (cleanRecs > 0 && combinedCost > 0)
     effData.push({ name: 'Blended', cpr: combinedCost / cleanRecs, color: '#d4a843' });
 
@@ -1476,6 +1476,4 @@ function renderOverview() {
   var qDaily = S.daily.filter(function(e) { return months.indexOf(getMonthKey(e.date)) >= 0; });
   var platRecs = {};
   var campSet = {};
-  for (var i = 0; i < qDaily.length; i++) {
-    var de = qDaily[i];
-    if (de.lp > 0) platRecs['Land P
+  for (var i = 0; i < qDail
