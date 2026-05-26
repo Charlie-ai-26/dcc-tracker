@@ -949,7 +949,7 @@ function renderDailyTable() {
     html += '<td class="v-cell" style="text-align:right">' + (eV > 0 ? eV.toLocaleString() : d) + '</td>';
     html += '<td class="v-cell" style="text-align:right">' + (vAlloc > 0 ? fmt(vAlloc) : d) + '</td>';
     html += '<td class="v-cell" style="text-align:right">' + (vRate > 0 ? '$' + vRate.toFixed(4) : d) + '</td>';
-    html += '<td class="rm-cell" style="text-align:right">' + (eRm > 0 ? eRm.toLocaleString() : d) + '</td>';
+    html += '<td class="rm-cell" style="text-align:right">' + (eLp > 0 ? eRm.toLocaleString() : d) + '</td>';
     html += '<td class="rm-cell" style="text-align:right">' + (rmAlloc > 0 ? fmt(rmAlloc) : d) + '</td>';
     html += '<td class="rm-cell" style="text-align:right">' + (rmRate > 0 ? '$' + rmRate.toFixed(4) : d) + '</td>';
     html += '<td class="sum-cell" style="text-align:right">' + (cleanRecs > 0 ? cleanRecs.toLocaleString() : d) + '</td>';
