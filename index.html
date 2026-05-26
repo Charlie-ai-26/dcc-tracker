@@ -1,0 +1,1479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Cost Control Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/gridjs@5.0.2/dist/gridjs.umd.js" integrity="sha384-/XXDzxe4FsGiAe50i/u9pY/Vy/uX654MHB1xoc1BJNnH1WXHhqHga9g3q5tF4gj7" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridjs@5.0.2/dist/theme/mermaid.min.css" integrity="sha384-63swlDnFJKncBzMhKCqTdGUKJKsD5mBFCD/wOqGn9R3UtR2RZN5GrfBjuYz5wNa5" crossorigin="anonymous">
+<style>
+:root { color-scheme: light; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #1a1a2e; line-height: 1.5; font-size: 13px; }
+.container { max-width: 1260px; margin: 0 auto; padding: 12px; }
+h1 { font-size: 20px; font-weight: 700; color: #0f3d2e; margin-bottom: 2px; }
+h2 { font-size: 15px; font-weight: 600; color: #0f3d2e; margin-bottom: 10px; }
+h3 { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; }
+.subtitle { font-size: 12px; color: #666; margin-bottom: 12px; }
+
+/* Tabs */
+.tabs { display: flex; gap: 2px; margin-bottom: 14px; border-bottom: 2px solid #e0e0e0; overflow-x: auto; }
+.tab { padding: 7px 14px; font-size: 12px; font-weight: 500; cursor: pointer; border: none; background: none; color: #666; border-bottom: 2px solid transparent; margin-bottom: -2px; white-space: nowrap; }
+.tab:hover { color: #0f3d2e; }
+.tab.active { color: #0f3d2e; border-bottom-color: #e8913a; font-weight: 600; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* KPI */
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.kpi-card { background: #fff; border-radius: 8px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+.kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #888; margin-bottom: 3px; }
+.kpi-value { font-size: 22px; font-weight: 700; color: #0f3d2e; }
+.kpi-sub { font-size: 10px; color: #999; margin-top: 1px; }
+.kpi-card.warn .kpi-value { color: #e8913a; }
+
+/* Layout */
+.card { background: #fff; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-bottom: 12px; }
+.chart-box { position: relative; height: 260px; width: 100%; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
+
+/* Forms */
+.form-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; margin-bottom: 10px; }
+.fg { display: flex; flex-direction: column; min-width: 130px; flex: 1; }
+.fg label { font-size: 10px; font-weight: 600; color: #555; margin-bottom: 2px; text-transform: uppercase; }
+.fg input, .fg select { padding: 5px 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 12px; }
+.fg input:focus, .fg select:focus { outline: none; border-color: #0f3d2e; }
+.btn { padding: 6px 16px; border: none; border-radius: 5px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.btn-p { background: #0f3d2e; color: #fff; }
+.btn-p:hover { background: #1a5c44; }
+.btn-x { background: #fef2f2; color: #d32f2f; border: 1px solid #fecaca; padding: 3px 8px; font-size: 11px; }
+.btn-o { background: #fff; border: 1px solid #ddd; color: #555; }
+
+/* Tables */
+.tbl { width: 100%; border-collapse: collapse; font-size: 11px; }
+.tbl th { text-align: left; padding: 8px 10px; background: #f8f9fa; font-size: 10px; text-transform: uppercase; color: #666; border-bottom: 2px solid #e0e0e0; white-space: nowrap; }
+.tbl td { padding: 7px 10px; border-bottom: 1px solid #eee; }
+.tbl tbody tr:nth-child(even) { background: #fafbfc; }
+.tbl tbody tr:hover { background: #f0f4f2; }
+
+/* Column group headers */
+.tbl .col-grp { text-align: center; font-size: 9px; letter-spacing: 0.8px; font-weight: 700; padding: 5px 4px; }
+.col-lp { background: #e8f5e9 !important; color: #1a5c44 !important; border-bottom: 2px solid #1a5c44 !important; }
+.col-v { background: #e0f2f1 !important; color: #0f3d2e !important; border-bottom: 2px solid #0f3d2e !important; }
+.col-rm { background: #fff3e0 !important; color: #e65100 !important; border-bottom: 2px solid #e8913a !important; }
+.col-sum { background: #f3e5f5 !important; color: #6b4c9a !important; border-bottom: 2px solid #6b4c9a !important; }
+
+/* Platform tint on data cells */
+#daily-tbl td.lp-cell { background: #f6fbf7; }
+#daily-tbl td.v-cell { background: #f4faf9; }
+#daily-tbl td.rm-cell { background: #fffbf5; }
+#daily-tbl td.sum-cell { background: #faf5fc; font-weight: 700; }
+#daily-tbl tbody tr:hover td.lp-cell { background: #eaf5eb; }
+#daily-tbl tbody tr:hover td.v-cell { background: #e6f5f2; }
+#daily-tbl tbody tr:hover td.rm-cell { background: #fff5e6; }
+#daily-tbl tbody tr:hover td.sum-cell { background: #f3eaf8; }
+.badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 10px; font-weight: 600; }
+.b-green { background: #e8f5e9; color: #2e7d32; }
+.b-orange { background: #fff3e0; color: #e65100; }
+.b-blue { background: #e3f2fd; color: #1565c0; }
+.b-gray { background: #f5f5f5; color: #666; }
+.b-red { background: #fce4ec; color: #c62828; }
+.b-teal { background: #e0f2f1; color: #00695c; }
+
+/* Period pills */
+.period-tabs { display: flex; gap: 4px; margin-bottom: 12px; }
+.ptab { padding: 4px 12px; border: 1px solid #ddd; border-radius: 5px; background: #fff; font-size: 11px; cursor: pointer; }
+.ptab.active { background: #0f3d2e; color: #fff; border-color: #0f3d2e; }
+
+/* Quarter selector */
+.q-sel { display: flex; gap: 4px; margin-bottom: 12px; }
+.qb { padding: 4px 12px; border: 1px solid #ddd; border-radius: 5px; background: #fff; font-size: 11px; cursor: pointer; }
+.qb.active { background: #0f3d2e; color: #fff; border-color: #0f3d2e; }
+
+/* Month selector */
+.m-sel { display: flex; gap: 4px; margin-bottom: 12px; flex-wrap: wrap; }
+.mb-pill { padding: 4px 10px; border: 1px solid #ddd; border-radius: 5px; background: #fff; font-size: 11px; cursor: pointer; }
+.mb-pill.active { background: #0f3d2e; color: #fff; border-color: #0f3d2e; }
+
+.flex-b { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.muted { color: #888; font-size: 11px; }
+.mt { margin-top: 10px; }
+.mb { margin-bottom: 10px; }
+
+/* Methodology */
+.mbox { background: #f8faf8; border-radius: 6px; padding: 12px; margin-bottom: 8px; border-left: 3px solid #0f3d2e; }
+.mbox h4 { font-size: 12px; color: #0f3d2e; margin-bottom: 3px; }
+.mbox p { font-size: 11px; color: #555; margin-bottom: 2px; }
+
+/* Frozen columns */
+#daily-tbl th:nth-child(1), #daily-tbl td:nth-child(1) {
+  position: sticky; left: 0; z-index: 2; min-width: 110px;
+}
+#daily-tbl td:nth-child(1) { background: #fff; }
+#daily-tbl tbody tr:nth-child(even) td:nth-child(1) { background: #fafbfc; }
+
+#daily-tbl th:nth-child(2), #daily-tbl td:nth-child(2) {
+  position: sticky; left: 110px; z-index: 2; min-width: 170px;
+  border-right: 2px solid #d0d0d0; box-shadow: 2px 0 4px rgba(0,0,0,0.04);
+}
+#daily-tbl td:nth-child(2) { background: #fff; font-weight: 600; }
+#daily-tbl tbody tr:nth-child(even) td:nth-child(2) { background: #fafbfc; }
+
+#daily-tbl thead th:nth-child(1), #daily-tbl thead th:nth-child(2) {
+  background: #f8f9fa; z-index: 4;
+}
+#daily-tbl thead th { position: sticky; top: 0; z-index: 3; }
+#daily-tbl tbody tr:hover td:nth-child(1),
+#daily-tbl tbody tr:hover td:nth-child(2) {
+  background: #f0f4f2;
+}
+
+/* Campaign Review frozen columns + tints */
+#camp-tbl th:nth-child(1), #camp-tbl td:nth-child(1) {
+  position: sticky; left: 0; z-index: 2; min-width: 180px;
+}
+#camp-tbl td:nth-child(1) { background: #fff; }
+#camp-tbl tbody tr:nth-child(even) td:nth-child(1) { background: #fafbfc; }
+
+#camp-tbl th:nth-child(2), #camp-tbl td:nth-child(2) {
+  position: sticky; left: 180px; z-index: 2; min-width: 70px;
+  border-right: 2px solid #d0d0d0; box-shadow: 2px 0 4px rgba(0,0,0,0.04);
+}
+#camp-tbl td:nth-child(2) { background: #fff; }
+#camp-tbl tbody tr:nth-child(even) td:nth-child(2) { background: #fafbfc; }
+
+#camp-tbl thead th:nth-child(1), #camp-tbl thead th:nth-child(2) {
+  background: #f8f9fa; z-index: 4;
+}
+#camp-tbl thead th { position: sticky; top: 0; z-index: 3; }
+#camp-tbl tbody tr:hover td:nth-child(1),
+#camp-tbl tbody tr:hover td:nth-child(2) {
+  background: #f0f4f2;
+}
+
+/* Shared tints for campaign review table */
+#camp-tbl td.lp-cell { background: #f6fbf7; }
+#camp-tbl td.v-cell { background: #f4faf9; }
+#camp-tbl td.rm-cell { background: #fffbf5; }
+#camp-tbl td.sum-cell { background: #faf5fc; font-weight: 700; }
+#camp-tbl tbody tr:nth-child(even) td.lp-cell { background: #eff8f0; }
+#camp-tbl tbody tr:nth-child(even) td.v-cell { background: #edf7f5; }
+#camp-tbl tbody tr:nth-child(even) td.rm-cell { background: #fef8ee; }
+#camp-tbl tbody tr:nth-child(even) td.sum-cell { background: #f5eef9; }
+#camp-tbl tbody tr:hover td.lp-cell { background: #eaf5eb; }
+#camp-tbl tbody tr:hover td.v-cell { background: #e6f5f2; }
+#camp-tbl tbody tr:hover td.rm-cell { background: #fff5e6; }
+#camp-tbl tbody tr:hover td.sum-cell { background: #f3eaf8; }
+
+/* Admin mode */
+.admin-lock { cursor: pointer; font-size: 13px; user-select: none; padding: 2px 6px; border-radius: 4px; }
+.admin-lock:hover { background: #f0f0f0; }
+.admin-lock.unlocked { color: #2e7d32; }
+.bm-edit-btn { cursor: pointer; font-size: 10px; margin-left: 4px; color: #888; border: none; background: none; padding: 0 3px; border-radius: 3px; }
+.bm-edit-btn:hover { color: #0f3d2e; background: #e8f5e9; }
+.bm-edit-sel { font-size: 10px; padding: 2px 4px; border: 1px solid #0f3d2e; border-radius: 4px; background: #fff; }
+.bm-edit-sel:focus { outline: none; box-shadow: 0 0 0 2px rgba(15,61,46,0.2); }
+
+/* Empty state */
+.empty { text-align: center; padding: 30px; color: #aaa; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Data Cost Control Tracker</h1>
+  <p class="subtitle">Land AI — Source of truth: <a href="https://cc.landai.ai/campaigns" target="_blank" style="color:#0f3d2e">Command Center</a> | Daily entries consolidate to weekly / monthly / quarterly / yearly | <span style="color:#0f3d2e;cursor:pointer;" onclick="load(function(){renderAll();})" title="Refresh data from database">&#x21bb; Refresh</span> | <span id="admin-lock" class="admin-lock" onclick="toggleAdmin()" title="Toggle admin mode">&#x1f512;</span></p>
+
+  <p class="muted" id="load-status" style="font-size:11px;margin-bottom:4px;">Loading data from database...</p>
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('daily', this)">Daily Entry</button>
+    <button class="tab" onclick="switchTab('costs', this)">Platform Costs</button>
+    <button class="tab" onclick="switchTab('consolidation', this)">Consolidation</button>
+    <button class="tab" onclick="switchTab('campaigns', this)">Campaign Review</button>
+    <button class="tab" onclick="switchTab('overview', this)">Overview</button>
+    <button class="tab" onclick="switchTab('methodology', this)">Methodology</button>
+  </div>
+
+  <!-- ========== DAILY ENTRY ========== -->
+  <div id="tab-daily" class="tab-content active">
+    <div class="card">
+      <h2>Daily Data Processor Log</h2>
+      <p class="muted mb">Enter records processed each day. These roll up automatically in the Consolidation tab.</p>
+      <div class="form-row">
+        <div class="fg" style="max-width:140px"><label>Date</label><input type="date" id="d-date"></div>
+        <div class="fg" style="min-width:200px"><label>Campaign</label><select id="d-camp"></select></div>
+        <div class="fg" style="max-width:140px"><label>Billing Month</label>
+          <select id="d-bmonth">
+            <option value="2026-01">January 2026</option>
+            <option value="2026-02">February 2026</option>
+            <option value="2026-03">March 2026</option>
+            <option value="2026-04">April 2026</option>
+            <option value="2026-05">May 2026</option>
+            <option value="2026-06">June 2026</option>
+            <option value="2026-07">July 2026</option>
+            <option value="2026-08">August 2026</option>
+            <option value="2026-09">September 2026</option>
+            <option value="2026-10">October 2026</option>
+            <option value="2026-11">November 2026</option>
+            <option value="2026-12">December 2026</option>
+          </select>
+        </div>
+        <div class="fg" style="max-width:110px"><label>LP Records</label><input type="number" id="d-lp" placeholder="0"></div>
+        <div class="fg" style="max-width:110px"><label>Versium Records</label><input type="number" id="d-v" placeholder="0"></div>
+        <div class="fg" style="max-width:110px"><label>RM Records</label><input type="number" id="d-rm" placeholder="0"></div>
+        <div class="fg" style="max-width:130px"><label>Entered By</label><input type="text" id="d-by" placeholder="Your name"></div>
+        <div class="fg" style="max-width:150px"><label>Notes</label><input type="text" id="d-notes" placeholder="Optional"></div>
+        <button class="btn btn-p" onclick="addDaily()">Log Entry</button>
+      </div>
+      <div class="flex-b mt">
+        <h3>Entries</h3>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <select id="d-month-sel" onchange="renderDailyTable()" style="font-size:11px;padding:3px 6px;border:1px solid #ddd;border-radius:4px;">
+            <option value="">All Months</option>
+            <option value="2026-04">April 2026</option>
+            <option value="2026-05">May 2026</option>
+            <option value="2026-06">June 2026</option>
+          </select>
+          <span class="muted" id="daily-count">0 entries</span>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+      <table class="tbl" id="daily-tbl">
+        <thead>
+          <tr>
+            <th rowspan="2">Date</th><th rowspan="2">Campaign</th><th rowspan="2">Billing<br>Month</th>
+            <th colspan="3" class="col-grp col-lp">Land Portal</th>
+            <th colspan="3" class="col-grp col-v">Versium</th>
+            <th colspan="3" class="col-grp col-rm">Readymode</th>
+            <th colspan="3" class="col-grp col-sum">Summary</th>
+            <th rowspan="2">By</th><th rowspan="2"></th>
+          </tr>
+          <tr>
+            <th class="col-lp" style="border-bottom-width:1px">Recs</th><th class="col-lp" style="border-bottom-width:1px">Cost</th><th class="col-lp" style="border-bottom-width:1px">$/Rec</th>
+            <th class="col-v" style="border-bottom-width:1px">Recs</th><th class="col-v" style="border-bottom-width:1px">Cost</th><th class="col-v" style="border-bottom-width:1px">$/Rec</th>
+            <th class="col-rm" style="border-bottom-width:1px">Recs</th><th class="col-rm" style="border-bottom-width:1px">Cost</th><th class="col-rm" style="border-bottom-width:1px">$/Rec</th>
+            <th class="col-sum" style="border-bottom-width:1px">Clean</th><th class="col-sum" style="border-bottom-width:1px">Total $</th><th class="col-sum" style="border-bottom-width:1px">Blended</th>
+          </tr>
+        </thead>
+        <tbody id="daily-body"></tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== PLATFORM COSTS ========== -->
+  <div id="tab-costs" class="tab-content">
+    <div class="card">
+      <h2>Monthly Platform Costs</h2>
+      <p class="muted mb">Enter the monthly invoice amount for each platform tool. Costs are always entered per month.</p>
+      <div class="form-row">
+        <div class="fg" style="max-width:150px"><label>Platform</label>
+          <select id="c-plat">
+            <option value="Land Portal">Land Portal</option>
+            <option value="Versium">Versium</option>
+            <option value="Readymode">Readymode</option>
+          </select>
+        </div>
+        <div class="fg" style="max-width:150px" id="c-month-wrap"><label>Month</label>
+          <select id="c-month">
+            <option value="2026-01">January 2026</option>
+            <option value="2026-02">February 2026</option>
+            <option value="2026-03">March 2026</option>
+            <option value="2026-04">April 2026</option>
+            <option value="2026-05" selected>May 2026</option>
+            <option value="2026-06">June 2026</option>
+            <option value="2026-07">July 2026</option>
+            <option value="2026-08">August 2026</option>
+            <option value="2026-09">September 2026</option>
+            <option value="2026-10">October 2026</option>
+            <option value="2026-11">November 2026</option>
+            <option value="2026-12">December 2026</option>
+          </select>
+        </div>
+        <div class="fg" style="max-width:140px"><label>Amount ($)</label><input type="number" id="c-amt" step="0.01" placeholder="0.00"></div>
+        <button class="btn btn-p" onclick="addCost()">Add Cost</button>
+      </div>
+      <div class="flex-b mt">
+        <h3>Cost Entries</h3>
+        <span class="muted" id="cost-count">0 entries</span>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>Month</th><th>Platform</th><th>Amount</th><th></th></tr></thead>
+        <tbody id="cost-body"></tbody>
+      </table>
+    </div>
+    <div class="card mt">
+      <h3>Platform Spend by Month</h3>
+      <div class="chart-box"><canvas id="platformChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ========== CONSOLIDATION ========== -->
+  <div id="tab-consolidation" class="tab-content">
+    <div class="card">
+      <div class="flex-b">
+        <h2>Record & Cost Consolidation</h2>
+        <div class="period-tabs">
+          <button class="ptab" onclick="setPeriod('daily')">Daily</button>
+          <button class="ptab" onclick="setPeriod('weekly')">Weekly</button>
+          <button class="ptab active" onclick="setPeriod('monthly')">Monthly</button>
+          <button class="ptab" onclick="setPeriod('quarterly')">Quarterly</button>
+          <button class="ptab" onclick="setPeriod('yearly')">Yearly</button>
+        </div>
+      </div>
+      <div class="form-row" style="margin-bottom:12px; align-items:center;">
+        <div class="fg" style="max-width:150px"><label>From</label><input type="date" id="con-from" onchange="renderConsolidation()"></div>
+        <div class="fg" style="max-width:150px"><label>To</label><input type="date" id="con-to" onchange="renderConsolidation()"></div>
+        <button class="btn btn-o" onclick="clearConFilter()" style="margin-top:14px;font-size:11px;">Clear</button>
+        <span class="muted" id="con-range-label" style="margin-top:14px;"></span>
+      </div>
+      <div id="consolidation-grid"></div>
+    </div>
+    <div class="two-col mt">
+      <div class="card">
+        <h3>Records by Platform Over Time</h3>
+        <div class="chart-box"><canvas id="recordsTrendChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Spend by Platform Over Time</h3>
+        <div class="chart-box"><canvas id="spendVsRecordsChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== CAMPAIGN REVIEW ========== -->
+  <div id="tab-campaigns" class="tab-content">
+    <div class="card">
+      <div class="flex-b">
+        <h2>Per-Campaign Cost Breakdown</h2>
+        <div>
+          <span class="muted" id="camp-month-label">Viewing: </span>
+          <select id="camp-month-sel" onchange="renderCampaignView()" style="font-size:11px;padding:3px 6px;border:1px solid #ddd;border-radius:4px;">
+            <option value="2026-04" selected>April 2026</option>
+          </select>
+        </div>
+      </div>
+      <p class="muted mb">Cost allocated by usage: (campaign platform records / total platform records) × platform cost. Clean Records = Land Portal − Dialer scrubbed.</p>
+      <div id="campaign-grid"></div>
+      <div class="flex-b mt"><span class="muted" id="camp-count"></span></div>
+    </div>
+    <div class="two-col mt">
+      <div class="card">
+        <h3>Allocated Cost by Campaign (Top 15)</h3>
+        <div class="chart-box"><canvas id="cprChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Cost per Record by Platform</h3>
+        <div class="chart-box"><canvas id="effChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== OVERVIEW ========== -->
+  <div id="tab-overview" class="tab-content">
+    <div class="q-sel">
+      <button class="qb" onclick="setQ('Q1')">Q1 2026</button>
+      <button class="qb active" onclick="setQ('Q2')">Q2 2026</button>
+    </div>
+    <div class="kpi-row" id="kpis"></div>
+    <div class="two-col">
+      <div class="card"><h3>Monthly Spend Trend</h3><div class="chart-box"><canvas id="spendChart"></canvas></div></div>
+      <div class="card"><h3>Platform Cost Share</h3><div class="chart-box"><canvas id="shareChart"></canvas></div></div>
+    </div>
+  </div>
+
+  <!-- ========== METHODOLOGY ========== -->
+  <div id="tab-methodology" class="tab-content">
+    <div class="card">
+      <h2>Definitions & Methodology</h2>
+      <p class="muted mb">How each metric is computed, where data comes from, and how to interpret it.</p>
+
+      <div class="mbox"><h4>Data Flow</h4>
+        <p><strong>Entry:</strong> Data processors enter records processed daily — campaign, record count, platform, and their name.</p>
+        <p><strong>Consolidation:</strong> Daily entries automatically roll up: Daily → Weekly (Sun-Sat) → Monthly → Quarterly → Yearly.</p>
+        <p><strong>Costs:</strong> Platform invoices are entered monthly in the Platform Costs tab (Land Portal, Versium, Readymode).</p>
+        <p><strong>Campaigns:</strong> Campaign names, tiers, and status come from the Command Center (cc.landai.ai/campaigns).</p>
+      </div>
+
+      <div class="mbox"><h4>$/Record (Per Platform Stage)</h4>
+        <p><strong>Formula:</strong> Platform monthly spend ÷ Platform monthly records.</p>
+        <p><strong>Calculated separately</strong> for Land Portal (data pull), Versium (skip trace), and Readymode (dialer/scrub) — never blended across platforms.</p>
+        <p><strong>Why separate:</strong> Each platform processes a fundamentally different stage of the pipeline. A Land Portal "record" is not the same unit as a Versium or Readymode "record."</p>
+      </div>
+
+      <div class="mbox"><h4>Blended $/Record</h4>
+        <p><strong>Formula:</strong> Total spend across all stages ÷ Clean Records that make it through the full pipeline.</p>
+        <p><strong>Use:</strong> Shows the true all-in cost to produce one usable lead record after all processing stages.</p>
+      </div>
+
+      <div class="mbox"><h4>Allocated Cost by Campaign</h4>
+        <p><strong>Formula:</strong> For each platform: (Campaign's platform records ÷ Total platform records) × Platform spend = Allocated cost for that platform. Sum across platforms for total campaign cost.</p>
+        <p><strong>Use:</strong> Identifies which campaigns consume the most cost per platform. Compare against tier price to flag margin risk.</p>
+      </div>
+
+      <div class="mbox"><h4>Clean Records</h4>
+        <p><strong>Formula:</strong> Land Portal records − Readymode (dialer) scrubbed-off records.</p>
+        <p><strong>Meaning:</strong> The number of records that survived the full pipeline — pulled from Land Portal, skip-traced through Versium, and not scrubbed out by the dialer. These are the usable records delivered for calling.</p>
+      </div>
+
+      <div class="mbox"><h4>Total Cost (Per Campaign)</h4>
+        <p><strong>Formula:</strong> Sum of allocated costs across all three platform stages (Land Portal + Versium + Readymode).</p>
+        <p><strong>Use:</strong> The all-in data processing cost for a single campaign in a given month.</p>
+      </div>
+
+      <div class="mbox" style="border-left-color:#e8913a"><h4>Service Tiers</h4>
+        <p><strong>Platform:</strong> 50 leads/mo — $3,575/mo</p>
+        <p><strong>Core:</strong> 100 leads/mo — $5,975/mo</p>
+        <p><strong>Partnership 200:</strong> 200 leads/mo — $10,995/mo</p>
+        <p><strong>Partnership 300:</strong> 300 leads/mo — $15,975/mo</p>
+        <p><strong>Partnership 400:</strong> 400 leads/mo — $20,800/mo</p>
+        <p><strong>Partnership 500:</strong> 500 leads/mo — $25,775/mo</p>
+      </div>
+
+      <div class="mbox" style="border-left-color:#888"><h4>Platform Tool Reference</h4>
+        <p><strong>Land Portal:</strong> Data sourcing — pulls raw property records by county. Stage 1 of the pipeline.</p>
+        <p><strong>Versium:</strong> Skip tracing — converts raw property records into contactable leads with phone numbers. Stage 2.</p>
+        <p><strong>Readymode:</strong> Dialer + risk management/scrub — DNC scrubbing and call delivery. Stage 3. Records scrubbed off here reduce Clean Records.</p>
+      </div>
+
+      <div class="mbox" style="border-left-color:#888"><h4>Campaign Types</h4>
+        <p><strong>Direct:</strong> Campaigns where Land AI provides data + calling directly to the client.</p>
+        <p><strong>Robin:</strong> Campaigns run through the Robin partnership channel.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CAMPAIGN DATA — SOURCE OF TRUTH: CC.LANDAI.AI/CAMPAIGNS
+// ============================================================
+var CC_CAMPAIGNS = [
+  {n:"American Land Group",s:"Active",t:"Platform",ty:"Direct"},
+  {n:"American Land Solutions LLC",s:"Active",t:"Core",ty:"Direct"},
+  {n:"Best Deal Land Buyers",s:"Active",t:"Core",ty:"Direct"},
+  {n:"Blue Sky Land Investments",s:"Active",t:"Platform",ty:"Direct"},
+  {n:"Brij Capital Group",s:"Active",t:"Platform",ty:"Direct"},
+  {n:"Broadwing Land",s:"Active",t:"Core",ty:"Direct"},
+  {n:"Carolina Acres",s:"Active",t:"Platform",ty:"Direct"},
+  {n:"Del-Val Homebuyers",s:"Active",t:"Platform",ty:"Direct"},
+  {n:"EAW Land",s:"Active",t:"Core",ty:"Direct"},
+  {n:"Falcon Property Group",s:"Active",t:"Platform",ty:"Direct"},
+  {n:"Five Tree Land",s:"Active",t:"Core",ty:"Robin"},
+  {n:"Foundational Land Company",s:"Active",t:"Core",ty:"Direct"},
+  {n:"Freedom Development Partners",s:"Active",t:"Platform",ty:"Direct"},
+  {n:"GCS Land Investments",s:"Active",t:"Platform",ty:"Direct"},
+  {n:"GF Development",s:"Active",t:"Platform",ty:"Robin"},
+  {n:"H4 Land Sales",s:"Active",t:"Platform",ty:"Direct"},
+  {n:"Harmony Investing",s:"Inactive",t:"—",ty:"Robin"},
+  {n:"Holland Matthews",s:"Active",t:"Platform",ty:"Direct"},
+  {n:"Jaz Land",s:"Inactive",t:"Platform",ty:"Direct"},
+  {n:"King Land",s:"Active",t:"CRM Only",ty:"Direct"},
+  {n:"Land Investing Solutions",s:"Paused",t:"—",ty:"Direct"},
+  {n:"Land Offer Direct",s:"Active",t:"Core",ty:"Direct"},
+  {n:"Land Order Holdings",s:"Active",t:"Platform",ty:"Direct"},
+  {n:"LandVault Ventures",s:"Active",t:"Platform",ty:"Direct"},
+  {n:"LandX",s:"Active",t:"Platform",ty:"Direct"},
+  {n:"Legacy Land LLC",s:"Active",t:"Platform",ty:"Direct"},
+  {n:"Lewis & Clark Land Holdings",s:"Active",t:"Core",ty:"Robin"},
+  {n:"Liberty Acres",s:"Active",t:"Partnership 200",ty:"Direct"},
+  {n:"Lion Land Investment",s:"Active",t:"Core",ty:"Direct"},
+  {n:"LQP",s:"Active",t:"Platform",ty:"Robin"},
+  {n:"Lyam Land",s:"Active",t:"Core",ty:"Direct"},
+  {n:"MTN REI",s:"Active",t:"CRM Only",ty:"Direct"},
+  {n:"Nationwide Land Group",s:"Active",t:"Core",ty:"Direct"},
+  {n:"NJ Property Group",s:"Active",t:"CRM Only",ty:"Direct"},
+  {n:"Once Upon a Land",s:"Active",t:"CRM Only",ty:"Direct"},
+  {n:"Pep Land Link",s:"Active",t:"Core",ty:"Robin"},
+  {n:"Premier Land Hub",s:"Active",t:"Core",ty:"Direct"},
+  {n:"Ranch Marketers",s:"Active",t:"Platform",ty:"Direct"},
+  {n:"RBI Properties",s:"Inactive",t:"Platform",ty:"Direct"},
+  {n:"Ryan's Land Deals",s:"Inactive",t:"Platform",ty:"Direct"},
+  {n:"Sam Crego",s:"Active",t:"CRM Only",ty:"Direct"},
+  {n:"San Bernard Land Company",s:"Active",t:"Platform",ty:"Robin"},
+  {n:"Seagrape Capital",s:"Active",t:"Platform",ty:"Direct"},
+  {n:"Skylux Real Estate",s:"Active",t:"Platform",ty:"Robin"},
+  {n:"Tailored Acquisitions",s:"Active",t:"Platform",ty:"Direct"},
+  {n:"Terra Firma Land",s:"Active",t:"Platform",ty:"Direct"},
+  {n:"The Favorite Land Investment",s:"Active",t:"Platform",ty:"Robin"},
+  {n:"Timberdoodle Land Company",s:"Active",t:"Core",ty:"Direct"},
+  {n:"Unpaved Properties",s:"Active",t:"Platform",ty:"Direct"},
+  {n:"US Land Investors",s:"Active",t:"Platform",ty:"Direct"},
+  {n:"Vacant Land Squad",s:"Active",t:"Platform",ty:"Direct"},
+  {n:"Wally's Land LLC",s:"Active",t:"Core",ty:"Direct"},
+  {n:"Willow Capital Holdings",s:"Active",t:"Platform",ty:"Direct"}
+];
+
+// Campaigns that need data pulls (exclude CRM Only and no-tier)
+var DATA_CAMPAIGNS = CC_CAMPAIGNS.filter(function(c) { return c.t !== 'CRM Only' && c.t !== '—'; });
+
+var TIERS = {
+  'Platform':        { price: 3575,  leads: 50,  color: '#0f3d2e' },
+  'Core':            { price: 5975,  leads: 100, color: '#e8913a' },
+  'Partnership 200': { price: 10995, leads: 200, color: '#d4a843' },
+  'Partnership 300': { price: 15975, leads: 300, color: '#1a5c44' },
+  'Partnership 400': { price: 20800, leads: 400, color: '#6b4c9a' },
+  'Partnership 500': { price: 25775, leads: 500, color: '#c0392b' }
+};
+
+// ============================================================
+// SUPABASE CLIENT
+// ============================================================
+var SUPA_URL = 'https://yeflauigtjsexadhiqiq.supabase.co';
+var SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InllZmxhdWlndGpzZXhhZGhpcWlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgzNjA0MjMsImV4cCI6MjA2MzkzNjQyM30.W-6c2_rsa1TRM1S7pvEy4vT1kGx7bevpqRKgbHio1gE';
+var sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+// ============================================================
+// STATE
+// ============================================================
+var S = { daily: [], costs: [], quarter: 'Q2', period: 'monthly' };
+var isAdmin = false;
+var CK = {};
+
+// Load data from Supabase
+function load(callback) {
+  var done = 0;
+  var total = 2;
+  var errors = [];
+  function check() {
+    done++;
+    if (done >= total) {
+      if (errors.length > 0) {
+        console.error('DCC load errors:', errors);
+        var el = document.getElementById('load-status');
+        if (el) el.textContent = 'Error loading data — check console. ' + errors.join('; ');
+      }
+      if (callback) callback();
+    }
+  }
+
+  sb.from('dcc_daily_entries').select('*').order('entry_date', {ascending: false}).then(function(res) {
+    if (res.error) { errors.push('Daily: ' + res.error.message); }
+    else if (res.data) {
+      S.daily = [];
+      for (var i = 0; i < res.data.length; i++) {
+        var r = res.data[i];
+        S.daily.push({ id: r.id, date: r.entry_date, camp: r.campaign, bm: r.billing_month || r.entry_date.substring(0,7), lp: r.lp_records || 0, v: r.v_records || 0, rm: r.rm_records || 0, by: r.entered_by || '', notes: r.notes || '' });
+      }
+    }
+    check();
+  }).catch(function(err) { errors.push('Daily fetch failed: ' + err.message); check(); });
+
+  sb.from('dcc_platform_costs').select('*').order('month', {ascending: false}).then(function(res) {
+    if (res.error) { errors.push('Costs: ' + res.error.message); }
+    else if (res.data) {
+      S.costs = [];
+      for (var i = 0; i < res.data.length; i++) {
+        var r = res.data[i];
+        S.costs.push({ id: r.id, month: r.month, plat: r.platform, amt: parseFloat(r.amount) });
+      }
+    }
+    check();
+  }).catch(function(err) { errors.push('Costs fetch failed: ' + err.message); check(); });
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function $(id) { return document.getElementById(id); }
+function fmt(n) { return '$' + n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtK(n) { return n >= 1000000 ? (n/1000000).toFixed(1)+'M' : n >= 1000 ? (n/1000).toFixed(1)+'K' : n.toString(); }
+
+function getWeekKey(dateStr) {
+  var d = new Date(dateStr + 'T12:00:00');
+  var sun = new Date(d); sun.setDate(d.getDate() - d.getDay());
+  return sun.toISOString().split('T')[0];
+}
+function getMonthKey(dateStr) { return dateStr.substring(0,7); }
+function getQuarterKey(dateStr) {
+  var m = parseInt(dateStr.substring(5,7));
+  return m <= 3 ? 'Q1' : m <= 6 ? 'Q2' : m <= 9 ? 'Q3' : 'Q4';
+}
+function getYearKey(dateStr) { return dateStr.substring(0,4); }
+
+function qMonths(q) {
+  if (q === 'Q1') return ['2026-01','2026-02','2026-03'];
+  if (q === 'Q2') return ['2026-04','2026-05','2026-06'];
+  if (q === 'Q3') return ['2026-07','2026-08','2026-09'];
+  return ['2026-10','2026-11','2026-12'];
+}
+
+function monthLabel(m) { return new Date(m+'-01T12:00:00').toLocaleDateString('en-US',{month:'long',year:'numeric'}); }
+function dateLabel(d) { return new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}); }
+
+// ============================================================
+// ADMIN MODE
+// ============================================================
+function toggleAdmin() {
+  if (isAdmin) {
+    isAdmin = false;
+    $('admin-lock').innerHTML = '&#x1f512;';
+    $('admin-lock').classList.remove('unlocked');
+    $('admin-lock').title = 'Toggle admin mode';
+    renderDailyTable();
+    return;
+  }
+  var pw = prompt('Enter admin password:');
+  if (pw === 'landai2026') {
+    isAdmin = true;
+    $('admin-lock').innerHTML = '&#x1f513;';
+    $('admin-lock').classList.add('unlocked');
+    $('admin-lock').title = 'Admin mode ON — click to lock';
+    renderDailyTable();
+  } else if (pw !== null) {
+    alert('Incorrect password.');
+  }
+}
+
+function editBillingMonth(id) {
+  var cell = document.getElementById('bm-cell-' + id);
+  if (!cell) return;
+  var entry = null;
+  for (var i = 0; i < S.daily.length; i++) {
+    if (S.daily[i].id === id) { entry = S.daily[i]; break; }
+  }
+  if (!entry) return;
+  var currentBm = entry.bm || getMonthKey(entry.date);
+  var months = ['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06','2026-07','2026-08','2026-09','2026-10','2026-11','2026-12'];
+  var html = '<select class="bm-edit-sel" onchange="saveBillingMonth(' + id + ', this.value)">';
+  for (var i = 0; i < months.length; i++) {
+    var sel = months[i] === currentBm ? ' selected' : '';
+    html += '<option value="' + months[i] + '"' + sel + '>' + monthLabel(months[i]) + '</option>';
+  }
+  html += '</select>';
+  cell.innerHTML = html;
+  cell.querySelector('select').focus();
+}
+
+function saveBillingMonth(id, newMonth) {
+  sb.from('dcc_daily_entries').update({ billing_month: newMonth }).eq('id', id).then(function(res) {
+    if (res.error) return alert('Error updating billing month: ' + res.error.message);
+    for (var i = 0; i < S.daily.length; i++) {
+      if (S.daily[i].id === id) { S.daily[i].bm = newMonth; break; }
+    }
+    renderAll();
+  });
+}
+
+function destroyChart(key) { if (CK[key]) { CK[key].destroy(); delete CK[key]; } }
+
+// Get cost for a specific month+platform
+function getCostForMonth(month, plat) {
+  for (var i = 0; i < S.costs.length; i++) {
+    if (S.costs[i].month === month && S.costs[i].plat === plat) return S.costs[i].amt;
+  }
+  return 0;
+}
+
+// ============================================================
+// CONSOLIDATION LOGIC
+// ============================================================
+function consolidate(period, fromDate, toDate) {
+  var keyFn;
+  if (period === 'daily') keyFn = function(d) { return d; };
+  else if (period === 'weekly') keyFn = getWeekKey;
+  else if (period === 'monthly') keyFn = getMonthKey;
+  else if (period === 'quarterly') keyFn = getQuarterKey;
+  else keyFn = getYearKey;
+
+  var groups = {};
+  var i, e, k;
+
+  // Filter daily entries by date range
+  var filtered = S.daily;
+  if (fromDate || toDate) {
+    filtered = S.daily.filter(function(e) {
+      if (fromDate && e.date < fromDate) return false;
+      if (toDate && e.date > toDate) return false;
+      return true;
+    });
+  }
+
+  for (i = 0; i < filtered.length; i++) {
+    e = filtered[i];
+    k = keyFn(e.date);
+    if (!groups[k]) groups[k] = { records: 0, byCamp: {}, byPlat: {}, costByPlat: {} };
+    var eLp = e.lp || 0, eV = e.v || 0, eRm = e.rm || 0;
+    var eTotal = eLp + eV + eRm;
+    groups[k].records += eTotal;
+    groups[k].byCamp[e.camp] = (groups[k].byCamp[e.camp] || 0) + eTotal;
+    if (eLp > 0) groups[k].byPlat['Land Portal'] = (groups[k].byPlat['Land Portal'] || 0) + eLp;
+    if (eV > 0) groups[k].byPlat['Versium'] = (groups[k].byPlat['Versium'] || 0) + eV;
+    if (eRm > 0) groups[k].byPlat['Readymode'] = (groups[k].byPlat['Readymode'] || 0) + eRm;
+  }
+
+  // Filter costs by date range (use first day of month for comparison)
+  var filteredCosts = S.costs;
+  if (fromDate || toDate) {
+    filteredCosts = S.costs.filter(function(c) {
+      var mStart = c.month + '-01';
+      // Last day of month
+      var parts = c.month.split('-');
+      var mEnd = new Date(parseInt(parts[0]), parseInt(parts[1]), 0);
+      var mEndStr = mEnd.toISOString().split('T')[0];
+      if (fromDate && mEndStr < fromDate) return false;
+      if (toDate && mStart > toDate) return false;
+      return true;
+    });
+  }
+
+  // Assign costs to periods
+  for (i = 0; i < filteredCosts.length; i++) {
+    var c = filteredCosts[i];
+    var ck;
+    if (period === 'daily') {
+      // Spread monthly cost across days that have entries in that month
+      var daysInMonth = [];
+      for (var j = 0; j < filtered.length; j++) {
+        if (getMonthKey(filtered[j].date) === c.month) {
+          if (daysInMonth.indexOf(filtered[j].date) < 0) daysInMonth.push(filtered[j].date);
+        }
+      }
+      if (daysInMonth.length > 0) {
+        var perDay = c.amt / daysInMonth.length;
+        for (var d = 0; d < daysInMonth.length; d++) {
+          if (!groups[daysInMonth[d]]) groups[daysInMonth[d]] = { records: 0, byCamp: {}, byPlat: {}, costByPlat: {} };
+          groups[daysInMonth[d]].costByPlat[c.plat] = (groups[daysInMonth[d]].costByPlat[c.plat] || 0) + perDay;
+        }
+      }
+    } else if (period === 'weekly') {
+      var lastDay = new Date(parseInt(c.month.substring(0,4)), parseInt(c.month.substring(5,7)), 0);
+      var ld = lastDay.toISOString().split('T')[0];
+      ck = getWeekKey(ld);
+      if (!groups[ck]) groups[ck] = { records: 0, byCamp: {}, byPlat: {}, costByPlat: {} };
+      groups[ck].costByPlat[c.plat] = (groups[ck].costByPlat[c.plat] || 0) + c.amt;
+    } else if (period === 'monthly') {
+      ck = c.month;
+      if (!groups[ck]) groups[ck] = { records: 0, byCamp: {}, byPlat: {}, costByPlat: {} };
+      groups[ck].costByPlat[c.plat] = (groups[ck].costByPlat[c.plat] || 0) + c.amt;
+    } else if (period === 'quarterly') {
+      var qm = parseInt(c.month.substring(5,7));
+      ck = qm <= 3 ? 'Q1' : qm <= 6 ? 'Q2' : qm <= 9 ? 'Q3' : 'Q4';
+      if (!groups[ck]) groups[ck] = { records: 0, byCamp: {}, byPlat: {}, costByPlat: {} };
+      groups[ck].costByPlat[c.plat] = (groups[ck].costByPlat[c.plat] || 0) + c.amt;
+    } else {
+      ck = c.month.substring(0,4);
+      if (!groups[ck]) groups[ck] = { records: 0, byCamp: {}, byPlat: {}, costByPlat: {} };
+      groups[ck].costByPlat[c.plat] = (groups[ck].costByPlat[c.plat] || 0) + c.amt;
+    }
+  }
+
+  return groups;
+}
+
+// ============================================================
+// RENDERING
+// ============================================================
+function renderAll() {
+  renderDailyTable();
+  renderCostTable();
+  renderPlatformChart();
+  renderConsolidation();
+  renderCampaignView();
+  renderOverview();
+  populateDropdown();
+}
+
+function populateDropdown() {
+  var sel = $('d-camp');
+  var current = sel.value;
+  var html = '<option value="">Select campaign...</option>';
+  html += '<option value="All Campaigns"' + (current==='All Campaigns'?' selected':'') + '>All Campaigns (Aggregate)</option>';
+  for (var i = 0; i < DATA_CAMPAIGNS.length; i++) {
+    var c = DATA_CAMPAIGNS[i];
+    html += '<option value="' + c.n + '"' + (c.n===current?' selected':'') + '>' + c.n + ' (' + c.t + ')</option>';
+  }
+  sel.innerHTML = html;
+
+  // Restore last entered-by name
+  var lastBy = '';
+  try { lastBy = localStorage.getItem('landai_dcc_lastby') || ''; } catch(e){}
+  if (lastBy && !$('d-by').value) $('d-by').value = lastBy;
+
+  // Set today's date and current billing month if empty
+  if (!$('d-date').value) {
+    var today = new Date();
+    $('d-date').value = today.toISOString().split('T')[0];
+  }
+  var bmSel = $('d-bmonth');
+  if (bmSel && !bmSel._initialized) {
+    var curMonth = new Date().toISOString().substring(0,7);
+    for (var bi = 0; bi < bmSel.options.length; bi++) {
+      if (bmSel.options[bi].value === curMonth) { bmSel.selectedIndex = bi; break; }
+    }
+    bmSel._initialized = true;
+  }
+}
+
+// --- DAILY ENTRY ---
+function addDaily() {
+  var date = $('d-date').value;
+  var camp = $('d-camp').value;
+  var bm = $('d-bmonth').value;
+  var lp = parseInt($('d-lp').value) || 0;
+  var v = parseInt($('d-v').value) || 0;
+  var rm = parseInt($('d-rm').value) || 0;
+  var by = $('d-by').value.trim();
+  var notes = $('d-notes').value;
+  if (!date || !camp) return alert('Enter date and campaign.');
+  if (lp <= 0 && v <= 0 && rm <= 0) return alert('Enter at least one platform record count.');
+  if (!by) return alert('Enter your name in the "Entered By" field.');
+
+  sb.from('dcc_daily_entries').insert({
+    entry_date: date, campaign: camp, billing_month: bm, lp_records: lp, v_records: v, rm_records: rm, entered_by: by, notes: notes
+  }).select().then(function(res) {
+    if (res.error) return alert('Error saving: ' + res.error.message);
+    var r = res.data[0];
+    S.daily.unshift({ id: r.id, date: r.entry_date, camp: r.campaign, bm: r.billing_month, lp: r.lp_records, v: r.v_records, rm: r.rm_records, by: r.entered_by, notes: r.notes || '' });
+    try { localStorage.setItem('landai_dcc_lastby', by); } catch(e){}
+    $('d-lp').value = ''; $('d-v').value = ''; $('d-rm').value = '';
+    $('d-notes').value = '';
+    renderAll();
+  });
+}
+function rmDaily(id) {
+  sb.from('dcc_daily_entries').delete().eq('id', id).then(function(res) {
+    if (res.error) return alert('Error deleting: ' + res.error.message);
+    S.daily = S.daily.filter(function(e) { return e.id !== id; });
+    renderAll();
+  });
+}
+
+function renderDailyTable() {
+  var selMonth = $('d-month-sel') ? $('d-month-sel').value : '';
+  var filtered = S.daily;
+  if (selMonth) {
+    filtered = S.daily.filter(function(e) { return (e.bm || getMonthKey(e.date)) === selMonth; });
+  }
+  var sorted = filtered.slice().sort(function(a,b) { return b.date.localeCompare(a.date) || b.id - a.id; });
+  $('daily-count').textContent = sorted.length + ' entries';
+
+  if (sorted.length === 0) {
+    $('daily-body').innerHTML = '<tr><td colspan="17" class="empty">No entries yet. Log your first daily record above.</td></tr>';
+    return;
+  }
+
+  // Compute monthly platform totals and rates for cost allocation (grouped by billing month)
+  var monthTotals = {}; // { month: { lp:N, v:N, rm:N } }
+  for (var i = 0; i < S.daily.length; i++) {
+    var mk = S.daily[i].bm || getMonthKey(S.daily[i].date);
+    if (!monthTotals[mk]) monthTotals[mk] = { lp:0, v:0, rm:0 };
+    monthTotals[mk].lp += (S.daily[i].lp || 0);
+    monthTotals[mk].v += (S.daily[i].v || 0);
+    monthTotals[mk].rm += (S.daily[i].rm || 0);
+  }
+
+  var html = '';
+  var limit = Math.min(sorted.length, 50);
+  for (var i = 0; i < limit; i++) {
+    var e = sorted[i];
+    var mk = e.bm || getMonthKey(e.date);
+    var mt = monthTotals[mk] || { lp:0, v:0, rm:0 };
+    var lpCost = getCostForMonth(mk, 'Land Portal');
+    var vCost = getCostForMonth(mk, 'Versium');
+    var rmCost = getCostForMonth(mk, 'Readymode');
+
+    // Per-platform monthly $/rec
+    var lpRate = (mt.lp > 0 && lpCost > 0) ? lpCost / mt.lp : 0;
+    var vRate = (mt.v > 0 && vCost > 0) ? vCost / mt.v : 0;
+    var rmRate = (mt.rm > 0 && rmCost > 0) ? rmCost / mt.rm : 0;
+
+    // Allocated costs for this entry
+    var eLp = e.lp || 0, eV = e.v || 0, eRm = e.rm || 0;
+    var lpAlloc = (mt.lp > 0 && eLp > 0) ? (eLp / mt.lp) * lpCost : 0;
+    var vAlloc = (mt.v > 0 && eV > 0) ? (eV / mt.v) * vCost : 0;
+    var rmAlloc = (mt.rm > 0 && eRm > 0) ? (eRm / mt.rm) * rmCost : 0;
+    var totalCost = lpAlloc + vAlloc + rmAlloc;
+    var cleanRecs = eLp - eRm;
+    if (cleanRecs < 0) cleanRecs = 0;
+    var blended = cleanRecs > 0 ? totalCost / cleanRecs : 0;
+
+    var d = '<span class="muted">—</span>';
+    html += '<tr>';
+    html += '<td style="white-space:nowrap">' + dateLabel(e.date) + '</td>';
+    html += '<td>' + e.camp + '</td>';
+    html += '<td id="bm-cell-' + e.id + '"><span class="badge b-green">' + monthLabel(mk) + '</span>' + (isAdmin ? '<button class="bm-edit-btn" onclick="editBillingMonth(' + e.id + ')" title="Edit billing month">&#9998;</button>' : '') + '</td>';
+    html += '<td class="lp-cell" style="text-align:right">' + (eLp > 0 ? eLp.toLocaleString() : d) + '</td>';
+    html += '<td class="lp-cell" style="text-align:right">' + (lpAlloc > 0 ? fmt(lpAlloc) : d) + '</td>';
+    html += '<td class="lp-cell" style="text-align:right">' + (lpRate > 0 ? '$' + lpRate.toFixed(4) : d) + '</td>';
+    html += '<td class="v-cell" style="text-align:right">' + (eV > 0 ? eV.toLocaleString() : d) + '</td>';
+    html += '<td class="v-cell" style="text-align:right">' + (vAlloc > 0 ? fmt(vAlloc) : d) + '</td>';
+    html += '<td class="v-cell" style="text-align:right">' + (vRate > 0 ? '$' + vRate.toFixed(4) : d) + '</td>';
+    html += '<td class="rm-cell" style="text-align:right">' + (eRm > 0 ? eRm.toLocaleString() : d) + '</td>';
+    html += '<td class="rm-cell" style="text-align:right">' + (rmAlloc > 0 ? fmt(rmAlloc) : d) + '</td>';
+    html += '<td class="rm-cell" style="text-align:right">' + (rmRate > 0 ? '$' + rmRate.toFixed(4) : d) + '</td>';
+    html += '<td class="sum-cell" style="text-align:right">' + (cleanRecs > 0 ? cleanRecs.toLocaleString() : d) + '</td>';
+    html += '<td class="sum-cell" style="text-align:right">' + (totalCost > 0 ? fmt(totalCost) : d) + '</td>';
+    html += '<td class="sum-cell" style="text-align:right">' + (blended > 0 ? '$' + blended.toFixed(4) : d) + '</td>';
+    html += '<td>' + (e.by || '—') + '</td>';
+    html += '<td><button class="btn-x" onclick="rmDaily(' + e.id + ')">x</button></td>';
+    html += '</tr>';
+  }
+  if (sorted.length > 50) html += '<tr><td colspan="17" class="muted" style="text-align:center">Showing 50 of ' + sorted.length + ' entries</td></tr>';
+  $('daily-body').innerHTML = html;
+
+  // Update month selector options dynamically (by billing month)
+  var monthsUsed = {};
+  for (var i = 0; i < S.daily.length; i++) { monthsUsed[S.daily[i].bm || getMonthKey(S.daily[i].date)] = true; }
+  var mKeys = Object.keys(monthsUsed).sort();
+  var selEl = $('d-month-sel');
+  if (selEl) {
+    var curVal = selEl.value;
+    var optHtml = '<option value="">All Months</option>';
+    for (var i = 0; i < mKeys.length; i++) {
+      optHtml += '<option value="' + mKeys[i] + '"' + (mKeys[i]===curVal?' selected':'') + '>' + monthLabel(mKeys[i]) + '</option>';
+    }
+    selEl.innerHTML = optHtml;
+  }
+}
+
+// --- PLATFORM COSTS ---
+function addCost() {
+  var plat = $('c-plat').value;
+  var month = $('c-month').value;
+  var amt = parseFloat($('c-amt').value) || 0;
+  if (amt <= 0) return alert('Enter a valid amount.');
+
+  // Check for duplicate
+  var existing = null;
+  for (var i = 0; i < S.costs.length; i++) {
+    if (S.costs[i].month === month && S.costs[i].plat === plat) {
+      existing = S.costs[i];
+      break;
+    }
+  }
+
+  if (existing) {
+    if (!confirm(plat + ' already has an entry for ' + monthLabel(month) + ' (' + fmt(existing.amt) + '). Replace it?')) return;
+    // Upsert — update the existing row
+    sb.from('dcc_platform_costs').update({ amount: amt }).eq('id', existing.id).select().then(function(res) {
+      if (res.error) return alert('Error updating: ' + res.error.message);
+      existing.amt = amt;
+      $('c-amt').value = ''; renderAll();
+    });
+  } else {
+    sb.from('dcc_platform_costs').insert({ month: month, platform: plat, amount: amt }).select().then(function(res) {
+      if (res.error) return alert('Error saving: ' + res.error.message);
+      var r = res.data[0];
+      S.costs.push({ id: r.id, month: r.month, plat: r.platform, amt: parseFloat(r.amount) });
+      $('c-amt').value = ''; renderAll();
+    });
+  }
+}
+function rmCost(id) {
+  sb.from('dcc_platform_costs').delete().eq('id', id).then(function(res) {
+    if (res.error) return alert('Error deleting: ' + res.error.message);
+    S.costs = S.costs.filter(function(c) { return c.id !== id; });
+    renderAll();
+  });
+}
+
+function renderCostTable() {
+  var sorted = S.costs.slice().sort(function(a,b) { return b.month.localeCompare(a.month) || a.plat.localeCompare(b.plat); });
+  $('cost-count').textContent = sorted.length + ' entries';
+  var html = '';
+  for (var i = 0; i < sorted.length; i++) {
+    var c = sorted[i];
+    var pColor = c.plat === 'Versium' ? 'b-teal' : c.plat === 'Readymode' ? 'b-orange' : 'b-blue';
+    html += '<tr><td>' + monthLabel(c.month) + '</td><td><span class="badge ' + pColor + '">' + c.plat + '</span></td><td><strong>' + fmt(c.amt) + '</strong></td><td><button class="btn-x" onclick="rmCost(' + c.id + ')">x</button></td></tr>';
+  }
+  $('cost-body').innerHTML = html;
+}
+
+function renderPlatformChart() {
+  destroyChart('plat');
+  var ctx = $('platformChart');
+  if (!ctx) return;
+  var allMonths = {};
+  for (var i = 0; i < S.costs.length; i++) { allMonths[S.costs[i].month] = true; }
+  var months = Object.keys(allMonths).sort();
+  if (months.length === 0) return;
+
+  var plats = ['Land Portal','Versium','Readymode'];
+  var colors = ['#1a5c44','#0f3d2e','#e8913a'];
+  var datasets = [];
+  for (var pi = 0; pi < plats.length; pi++) {
+    var pdata = [];
+    for (var mi = 0; mi < months.length; mi++) {
+      pdata.push(getCostForMonth(months[mi], plats[pi]));
+    }
+    datasets.push({ label: plats[pi], data: pdata, backgroundColor: colors[pi]+'88', borderColor: colors[pi], borderWidth: 1, borderRadius: 3 });
+  }
+  CK.plat = new Chart(ctx, {
+    type: 'bar', data: { labels: months.map(monthLabel), datasets: datasets },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } }, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { callback: function(v) { return '$'+v.toLocaleString(); } } } } }
+  });
+}
+
+// --- CONSOLIDATION ---
+function setPeriod(p) {
+  S.period = p;
+  var btns = document.querySelectorAll('.ptab');
+  for (var i = 0; i < btns.length; i++) {
+    if (btns[i].textContent.toLowerCase() === p) btns[i].classList.add('active');
+    else btns[i].classList.remove('active');
+  }
+  renderConsolidation();
+}
+
+function clearConFilter() {
+  $('con-from').value = '';
+  $('con-to').value = '';
+  renderConsolidation();
+}
+
+function renderConsolidation() {
+  var fromDate = $('con-from').value || '';
+  var toDate = $('con-to').value || '';
+  var groups = consolidate(S.period, fromDate, toDate);
+  var container = $('consolidation-grid');
+  var keys = Object.keys(groups).sort().reverse();
+
+  // Update range label
+  var rangeLabel = $('con-range-label');
+  if (fromDate || toDate) {
+    var parts = [];
+    if (fromDate) parts.push(dateLabel(fromDate));
+    if (toDate) parts.push(dateLabel(toDate));
+    rangeLabel.textContent = 'Filtered: ' + (fromDate && toDate ? parts[0] + ' → ' + parts[1] : fromDate ? 'From ' + parts[0] : 'Through ' + parts[0]);
+  } else {
+    rangeLabel.textContent = '';
+  }
+
+  if (keys.length === 0) {
+    container.innerHTML = '<p class="empty">No data yet. Add daily entries to see consolidation.</p>';
+  } else {
+    var html = '<table class="tbl"><thead><tr><th>Period</th><th>LP Records</th><th>LP Cost</th><th>Versium Recs</th><th>Versium Cost</th><th>RM Records</th><th>RM Cost</th><th>Campaigns</th></tr></thead><tbody>';
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      var g = groups[k];
+      var lpR = g.byPlat['Land Portal'] || 0;
+      var vR = g.byPlat['Versium'] || 0;
+      var rmR = g.byPlat['Readymode'] || 0;
+      var lpC = (g.costByPlat && g.costByPlat['Land Portal']) || 0;
+      var vC = (g.costByPlat && g.costByPlat['Versium']) || 0;
+      var rmC = (g.costByPlat && g.costByPlat['Readymode']) || 0;
+      var campCount = Object.keys(g.byCamp).length;
+
+      var label;
+      if (S.period === 'daily') label = dateLabel(k);
+      else if (S.period === 'weekly') label = 'W/O ' + new Date(k+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      else if (S.period === 'quarterly') label = k + ' 2026';
+      else if (S.period === 'yearly') label = k;
+      else label = monthLabel(k);
+
+      html += '<tr><td><strong>' + label + '</strong></td>';
+      html += '<td>' + (lpR > 0 ? lpR.toLocaleString() : '<span class="muted">—</span>') + '</td>';
+      html += '<td>' + (lpC > 0 ? fmt(lpC) : '<span class="muted">—</span>') + '</td>';
+      html += '<td>' + (vR > 0 ? vR.toLocaleString() : '<span class="muted">—</span>') + '</td>';
+      html += '<td>' + (vC > 0 ? fmt(vC) : '<span class="muted">—</span>') + '</td>';
+      html += '<td>' + (rmR > 0 ? rmR.toLocaleString() : '<span class="muted">—</span>') + '</td>';
+      html += '<td>' + (rmC > 0 ? fmt(rmC) : '<span class="muted">—</span>') + '</td>';
+      html += '<td>' + campCount + '</td></tr>';
+    }
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  }
+
+  renderRecordsTrend(groups);
+  renderSpendTrend(groups);
+}
+
+function renderRecordsTrend(groups) {
+  destroyChart('recTrend');
+  var ctx = $('recordsTrendChart');
+  if (!ctx) return;
+  var keys = Object.keys(groups).sort();
+  var labels = keys.map(function(k) {
+    if (S.period === 'daily') return k.substring(5);
+    if (S.period === 'weekly') return 'W/O ' + k.substring(5);
+    if (S.period === 'quarterly') return k;
+    if (S.period === 'yearly') return k;
+    return k;
+  });
+  CK.recTrend = new Chart(ctx, {
+    type: 'line', data: {
+      labels: labels, datasets: [
+        { label: 'Land Portal', data: keys.map(function(k) { return (groups[k].byPlat && groups[k].byPlat['Land Portal']) || 0; }), borderColor: '#1a5c44', fill: false, tension: 0.3, pointRadius: 3 },
+        { label: 'Versium', data: keys.map(function(k) { return (groups[k].byPlat && groups[k].byPlat['Versium']) || 0; }), borderColor: '#0f3d2e', fill: false, tension: 0.3, pointRadius: 3 },
+        { label: 'Readymode', data: keys.map(function(k) { return (groups[k].byPlat && groups[k].byPlat['Readymode']) || 0; }), borderColor: '#e8913a', fill: false, tension: 0.3, pointRadius: 3 }
+      ]
+    }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } }, scales: { y: { beginAtZero: true } } }
+  });
+}
+
+function renderSpendTrend(groups) {
+  destroyChart('svr');
+  var ctx = $('spendVsRecordsChart');
+  if (!ctx) return;
+  var keys = Object.keys(groups).sort();
+  var labels = keys.map(function(k) {
+    if (S.period === 'daily') return k.substring(5);
+    if (S.period === 'weekly') return 'W/O ' + k.substring(5);
+    if (S.period === 'quarterly') return k;
+    if (S.period === 'yearly') return k;
+    return k;
+  });
+  CK.svr = new Chart(ctx, {
+    type: 'bar', data: {
+      labels: labels,
+      datasets: [
+        { label: 'Land Portal', data: keys.map(function(k) { return (groups[k].costByPlat && groups[k].costByPlat['Land Portal']) || 0; }), backgroundColor: '#1a5c4488', borderRadius: 3, stack: 'cost' },
+        { label: 'Versium', data: keys.map(function(k) { return (groups[k].costByPlat && groups[k].costByPlat['Versium']) || 0; }), backgroundColor: '#0f3d2e88', borderRadius: 3, stack: 'cost' },
+        { label: 'Readymode', data: keys.map(function(k) { return (groups[k].costByPlat && groups[k].costByPlat['Readymode']) || 0; }), backgroundColor: '#e8913a88', borderRadius: 3, stack: 'cost' }
+      ]
+    }, options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } },
+      scales: { y: { beginAtZero: true, stacked: true, ticks: { callback: function(v) { return '$'+v.toLocaleString(); } } } }
+    }
+  });
+}
+
+// --- CAMPAIGN REVIEW ---
+function renderCampaignView() {
+  var selMonth = $('camp-month-sel').value;
+  var lpCostTotal = getCostForMonth(selMonth, 'Land Portal');
+  var vCostTotal = getCostForMonth(selMonth, 'Versium');
+  var rmCostTotal = getCostForMonth(selMonth, 'Readymode');
+
+  // Filter daily entries for selected billing month
+  var mDaily = S.daily.filter(function(e) { return (e.bm || getMonthKey(e.date)) === selMonth; });
+
+  // Platform totals
+  var platTotalRecs = {};
+  var campPlatRecs = {};
+  for (var i = 0; i < mDaily.length; i++) {
+    var e = mDaily[i];
+    var eLp = e.lp || 0, eV = e.v || 0, eRm = e.rm || 0;
+    if (!campPlatRecs[e.camp]) campPlatRecs[e.camp] = {};
+    if (eLp > 0) {
+      platTotalRecs['Land Portal'] = (platTotalRecs['Land Portal']||0) + eLp;
+      campPlatRecs[e.camp]['Land Portal'] = (campPlatRecs[e.camp]['Land Portal']||0) + eLp;
+    }
+    if (eV > 0) {
+      platTotalRecs['Versium'] = (platTotalRecs['Versium']||0) + eV;
+      campPlatRecs[e.camp]['Versium'] = (campPlatRecs[e.camp]['Versium']||0) + eV;
+    }
+    if (eRm > 0) {
+      platTotalRecs['Readymode'] = (platTotalRecs['Readymode']||0) + eRm;
+      campPlatRecs[e.camp]['Readymode'] = (campPlatRecs[e.camp]['Readymode']||0) + eRm;
+    }
+  }
+
+  // $/Record per platform
+  var lpCpr = (platTotalRecs['Land Portal'] > 0 && lpCostTotal > 0) ? lpCostTotal / platTotalRecs['Land Portal'] : 0;
+  var vCpr = (platTotalRecs['Versium'] > 0 && vCostTotal > 0) ? vCostTotal / platTotalRecs['Versium'] : 0;
+  var rmCpr = (platTotalRecs['Readymode'] > 0 && rmCostTotal > 0) ? rmCostTotal / platTotalRecs['Readymode'] : 0;
+
+  // Build rows matching Excel structure
+  var rows = [];
+  var campNames = Object.keys(campPlatRecs);
+  for (var i = 0; i < campNames.length; i++) {
+    var name = campNames[i];
+    if (name === 'All Campaigns') continue;
+    var cRecs = campPlatRecs[name];
+    var lpR = cRecs['Land Portal'] || 0;
+    var vR = cRecs['Versium'] || 0;
+    var rmR = cRecs['Readymode'] || 0;
+
+    // Allocated costs
+    var lpAlloc = (platTotalRecs['Land Portal'] > 0 && lpR > 0) ? (lpR / platTotalRecs['Land Portal']) * lpCostTotal : 0;
+    var vAlloc = (platTotalRecs['Versium'] > 0 && vR > 0) ? (vR / platTotalRecs['Versium']) * vCostTotal : 0;
+    var rmAlloc = (platTotalRecs['Readymode'] > 0 && rmR > 0) ? (rmR / platTotalRecs['Readymode']) * rmCostTotal : 0;
+    var totalCost = lpAlloc + vAlloc + rmAlloc;
+
+    // Clean records = LP - RM
+    var cleanRecs = lpR - rmR;
+    if (cleanRecs < 0) cleanRecs = 0;
+
+    // Blended $/rec
+    var blended = cleanRecs > 0 ? totalCost / cleanRecs : 0;
+
+    // Find campaign type
+    var campType = '—';
+    for (var j = 0; j < CC_CAMPAIGNS.length; j++) {
+      if (CC_CAMPAIGNS[j].n === name) { campType = CC_CAMPAIGNS[j].ty || 'Direct'; break; }
+    }
+
+    rows.push([
+      name,
+      campType,
+      lpR > 0 ? lpR.toLocaleString() : '—',
+      lpAlloc > 0 ? fmt(lpAlloc) : '—',
+      lpCpr > 0 ? '$' + lpCpr.toFixed(4) : '—',
+      vR > 0 ? vR.toLocaleString() : '—',
+      vAlloc > 0 ? fmt(vAlloc) : '—',
+      vCpr > 0 ? '$' + vCpr.toFixed(4) : '—',
+      rmR > 0 ? rmR.toLocaleString() : '—',
+      rmAlloc > 0 ? fmt(rmAlloc) : '—',
+      rmCpr > 0 ? '$' + rmCpr.toFixed(4) : '—',
+      cleanRecs > 0 ? cleanRecs.toLocaleString() : '—',
+      totalCost > 0 ? fmt(totalCost) : '—',
+      blended > 0 ? '$' + blended.toFixed(4) : '—'
+    ]);
+  }
+
+  var container = $('campaign-grid');
+  container.innerHTML = '';
+  if (rows.length === 0) {
+    container.innerHTML = '<p class="empty">No per-campaign data for ' + monthLabel(selMonth) + '. Add daily entries to see campaign breakdown.</p>';
+  } else {
+    // Sort rows by total cost descending (column 12)
+    rows.sort(function(a,b) {
+      var av = typeof a[12] === 'string' && a[12] !== '—' ? parseFloat(a[12].replace(/[$,]/g,'')) : 0;
+      var bv = typeof b[12] === 'string' && b[12] !== '—' ? parseFloat(b[12].replace(/[$,]/g,'')) : 0;
+      return bv - av;
+    });
+    var d = '<span class="muted">—</span>';
+    var thtml = '<div style="overflow-x:auto;"><table class="tbl" id="camp-tbl"><thead>';
+    thtml += '<tr>';
+    thtml += '<th rowspan="2">Campaign</th><th rowspan="2">Type</th>';
+    thtml += '<th colspan="3" class="col-grp col-lp">Land Portal</th>';
+    thtml += '<th colspan="3" class="col-grp col-v">Versium</th>';
+    thtml += '<th colspan="3" class="col-grp col-rm">Readymode</th>';
+    thtml += '<th colspan="3" class="col-grp col-sum">Summary</th>';
+    thtml += '</tr><tr>';
+    thtml += '<th class="col-lp" style="border-bottom-width:1px">Recs</th><th class="col-lp" style="border-bottom-width:1px">Cost</th><th class="col-lp" style="border-bottom-width:1px">$/Rec</th>';
+    thtml += '<th class="col-v" style="border-bottom-width:1px">Recs</th><th class="col-v" style="border-bottom-width:1px">Cost</th><th class="col-v" style="border-bottom-width:1px">$/Rec</th>';
+    thtml += '<th class="col-rm" style="border-bottom-width:1px">Recs</th><th class="col-rm" style="border-bottom-width:1px">Cost</th><th class="col-rm" style="border-bottom-width:1px">$/Rec</th>';
+    thtml += '<th class="col-sum" style="border-bottom-width:1px">Clean</th><th class="col-sum" style="border-bottom-width:1px">Total $</th><th class="col-sum" style="border-bottom-width:1px">Blended</th>';
+    thtml += '</tr></thead><tbody>';
+    for (var ri = 0; ri < rows.length; ri++) {
+      var r = rows[ri];
+      var typeBadge = r[1] === 'Robin' ? '<span class="badge b-orange">Robin</span>' : '<span class="badge b-blue">Direct</span>';
+      thtml += '<tr>';
+      thtml += '<td style="font-weight:600">' + r[0] + '</td>';
+      thtml += '<td>' + typeBadge + '</td>';
+      thtml += '<td class="lp-cell" style="text-align:right">' + (r[2] !== '—' ? r[2] : d) + '</td>';
+      thtml += '<td class="lp-cell" style="text-align:right">' + (r[3] !== '—' ? r[3] : d) + '</td>';
+      thtml += '<td class="lp-cell" style="text-align:right">' + (r[4] !== '—' ? r[4] : d) + '</td>';
+      thtml += '<td class="v-cell" style="text-align:right">' + (r[5] !== '—' ? r[5] : d) + '</td>';
+      thtml += '<td class="v-cell" style="text-align:right">' + (r[6] !== '—' ? r[6] : d) + '</td>';
+      thtml += '<td class="v-cell" style="text-align:right">' + (r[7] !== '—' ? r[7] : d) + '</td>';
+      thtml += '<td class="rm-cell" style="text-align:right">' + (r[8] !== '—' ? r[8] : d) + '</td>';
+      thtml += '<td class="rm-cell" style="text-align:right">' + (r[9] !== '—' ? r[9] : d) + '</td>';
+      thtml += '<td class="rm-cell" style="text-align:right">' + (r[10] !== '—' ? r[10] : d) + '</td>';
+      thtml += '<td class="sum-cell" style="text-align:right">' + (r[11] !== '—' ? r[11] : d) + '</td>';
+      thtml += '<td class="sum-cell" style="text-align:right">' + (r[12] !== '—' ? r[12] : d) + '</td>';
+      thtml += '<td class="sum-cell" style="text-align:right">' + (r[13] !== '—' ? r[13] : d) + '</td>';
+      thtml += '</tr>';
+    }
+    thtml += '</tbody></table></div>';
+    container.innerHTML = thtml;
+  }
+
+  // Summary line
+  var totalLP = platTotalRecs['Land Portal'] || 0;
+  var totalV = platTotalRecs['Versium'] || 0;
+  var totalRM = platTotalRecs['Readymode'] || 0;
+  var combinedCost = lpCostTotal + vCostTotal + rmCostTotal;
+  $('camp-count').textContent = campNames.length + ' campaigns | LP: ' + fmtK(totalLP) + ' recs | Versium: ' + fmtK(totalV) + ' recs | RM: ' + fmtK(totalRM) + ' recs | Combined: ' + fmt(combinedCost);
+
+  renderCPRChart(campPlatRecs, platTotalRecs, lpCostTotal, vCostTotal, rmCostTotal);
+  renderEffChart(platTotalRecs, lpCostTotal, vCostTotal, rmCostTotal, combinedCost, totalLP, totalRM);
+
+  // Dynamically populate month selector from available data (by billing month)
+  var monthsUsed = {};
+  for (var mi = 0; mi < S.daily.length; mi++) { monthsUsed[S.daily[mi].bm || getMonthKey(S.daily[mi].date)] = true; }
+  for (var mi = 0; mi < S.costs.length; mi++) { monthsUsed[S.costs[mi].month] = true; }
+  var mKeys = Object.keys(monthsUsed).sort();
+  var selEl = $('camp-month-sel');
+  if (selEl && mKeys.length > 0) {
+    var curVal = selEl.value;
+    if (mKeys.indexOf(curVal) < 0) curVal = mKeys[mKeys.length - 1];
+    var optHtml = '';
+    for (var mi = 0; mi < mKeys.length; mi++) {
+      optHtml += '<option value="' + mKeys[mi] + '"' + (mKeys[mi]===curVal?' selected':'') + '>' + monthLabel(mKeys[mi]) + '</option>';
+    }
+    selEl.innerHTML = optHtml;
+  }
+}
+
+function renderCPRChart(campPlatRecs, platTotalRecs, lpCostTotal, vCostTotal, rmCostTotal) {
+  destroyChart('cpr');
+  var ctx = $('cprChart');
+  if (!ctx) return;
+
+  var entries = [];
+  var campNames = Object.keys(campPlatRecs);
+  for (var i = 0; i < campNames.length; i++) {
+    var name = campNames[i];
+    if (name === 'All Campaigns') continue;
+    var cRecs = campPlatRecs[name];
+    var totalAlloc = 0;
+    var plats = ['Land Portal','Versium','Readymode'];
+    var platCosts = [lpCostTotal, vCostTotal, rmCostTotal];
+    for (var p = 0; p < plats.length; p++) {
+      var r = cRecs[plats[p]] || 0;
+      if (r > 0 && platTotalRecs[plats[p]] > 0) {
+        totalAlloc += (r / platTotalRecs[plats[p]]) * platCosts[p];
+      }
+    }
+    if (totalAlloc > 0) entries.push({ name: name.length > 20 ? name.substring(0,20)+'...' : name, cost: totalAlloc });
+  }
+  entries.sort(function(a,b) { return b.cost - a.cost; });
+  var data = entries.slice(0, 15);
+
+  if (data.length === 0) { ctx.parentElement.innerHTML = '<p class="empty">No allocated cost data for this month</p>'; return; }
+
+  CK.cpr = new Chart(ctx, {
+    type: 'bar', data: {
+      labels: data.map(function(d) { return d.name; }),
+      datasets: [{ label: 'Total Allocated Cost', data: data.map(function(d) { return d.cost; }), backgroundColor: '#0f3d2e44', borderColor: '#0f3d2e', borderWidth: 1, borderRadius: 3 }]
+    }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { callback: function(v) { return '$'+v.toLocaleString(undefined,{maximumFractionDigits:0}); } } } } }
+  });
+}
+
+function renderEffChart(platTotalRecs, lpCost, vCost, rmCost, combinedCost, totalLP, totalRM) {
+  destroyChart('eff');
+  var ctx = $('effChart');
+  if (!ctx) return;
+
+  var effData = [];
+  if (platTotalRecs['Land Portal'] > 0 && lpCost > 0)
+    effData.push({ name: 'Land Portal', cpr: lpCost / platTotalRecs['Land Portal'], color: '#1a5c44' });
+  if (platTotalRecs['Versium'] > 0 && vCost > 0)
+    effData.push({ name: 'Versium', cpr: vCost / platTotalRecs['Versium'], color: '#0f3d2e' });
+  if (platTotalRecs['Readymode'] > 0 && rmCost > 0)
+    effData.push({ name: 'Readymode', cpr: rmCost / platTotalRecs['Readymode'], color: '#e8913a' });
+
+  var cleanRecs = totalLP - (platTotalRecs['Readymode'] || 0);
+  if (cleanRecs > 0 && combinedCost > 0)
+    effData.push({ name: 'Blended', cpr: combinedCost / cleanRecs, color: '#d4a843' });
+
+  if (effData.length === 0) { ctx.parentElement.innerHTML = '<p class="empty">Add records and costs to see $/record</p>'; return; }
+
+  CK.eff = new Chart(ctx, {
+    type: 'bar', data: {
+      labels: effData.map(function(d) { return d.name; }),
+      datasets: [{ label: '$/Record', data: effData.map(function(d) { return d.cpr; }), backgroundColor: effData.map(function(d) { return d.color + '88'; }), borderColor: effData.map(function(d) { return d.color; }), borderWidth: 1, borderRadius: 3 }]
+    }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: function(v) { return '$'+v.toFixed(3); } } } } }
+  });
+}
+
+// --- OVERVIEW ---
+function setQ(q) {
+  S.quarter = q;
+  var btns = document.querySelectorAll('.qb');
+  for (var i = 0; i < btns.length; i++) {
+    if (btns[i].textContent.indexOf(q) >= 0) btns[i].classList.add('active');
+    else btns[i].classList.remove('active');
+  }
+  renderOverview();
+}
+
+function renderOverview() {
+  var months = qMonths(S.quarter);
+
+  // Quarter costs
+  var platSpend = {};
+  var totalSpend = 0;
+  for (var i = 0; i < S.costs.length; i++) {
+    var c = S.costs[i];
+    if (months.indexOf(c.month) >= 0) {
+      platSpend[c.plat] = (platSpend[c.plat]||0) + c.amt;
+      totalSpend += c.amt;
+    }
+  }
+
+  // Quarter records
+  var qDaily = S.daily.filter(function(e) { return months.indexOf(getMonthKey(e.date)) >= 0; });
+  var platRecs = {};
+  var campSet = {};
+  for (var i = 0; i < qDaily.length; i++) {
+    var de = qDaily[i];
+    if (de.lp > 0) platRecs['Land Portal'] = (platRecs['Land Portal']||0) + de.lp;
+    if (de.v > 0) platRecs['Versium'] = (platRecs['Versium']||0) + de.v;
+    if (de.rm > 0) platRecs['Readymode'] = (platRecs['Readymode']||0) + de.rm;
+    campSet[de.camp] = true;
+  }
+  var campCount = Object.keys(campSet).length;
+
+  var lpR = platRecs['Land Portal'] || 0;
+  var vR = platRecs['Versium'] || 0;
+  var rmR = platRecs['Readymode'] || 0;
+  var lpS = platSpend['Land Portal'] || 0;
+  var vS = platSpend['Versium'] || 0;
+  var rmS = platSpend['Readymode'] || 0;
+
+  var lpCpr = lpR > 0 && lpS > 0 ? lpS / lpR : 0;
+  var vCpr = vR > 0 && vS > 0 ? vS / vR : 0;
+  var rmCpr = rmR > 0 && rmS > 0 ? rmS / rmR : 0;
+  var cleanRecs = lpR - rmR;
+  var blendedCpr = cleanRecs > 0 && totalSpend > 0 ? totalSpend / cleanRecs : 0;
+
+  $('kpis').innerHTML =
+    '<div class="kpi-card"><div class="kpi-label">Total Spend (' + S.quarter + ')</div><div class="kpi-value">' + fmt(totalSpend) + '</div><div class="kpi-sub">All platforms combined</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">Land Portal</div><div class="kpi-value">' + (lpR > 0 ? fmtK(lpR) + ' recs' : '—') + '</div><div class="kpi-sub">' + (lpCpr > 0 ? '$' + lpCpr.toFixed(4) + '/rec | ' + fmt(lpS) : 'No cost data') + '</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">Versium</div><div class="kpi-value">' + (vR > 0 ? fmtK(vR) + ' recs' : '—') + '</div><div class="kpi-sub">' + (vCpr > 0 ? '$' + vCpr.toFixed(4) + '/rec | ' + fmt(vS) : 'No cost data') + '</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">Readymode</div><div class="kpi-value">' + (rmR > 0 ? fmtK(rmR) + ' recs' : '—') + '</div><div class="kpi-sub">' + (rmCpr > 0 ? '$' + rmCpr.toFixed(4) + '/rec | ' + fmt(rmS) : 'No cost data') + '</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">Blended $/Record</div><div class="kpi-value">' + (blendedCpr > 0 ? '$' + blendedCpr.toFixed(4) : '—') + '</div><div class="kpi-sub">' + (cleanRecs > 0 ? fmtK(cleanRecs) + ' clean records' : 'No data') + '</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">Campaigns</div><div class="kpi-value">' + (campCount || DATA_CAMPAIGNS.length) + '</div><div class="kpi-sub">' + (campCount > 0 ? 'With recorded data' : 'From Command Center') + '</div></div>';
+
+  // Spend chart
+  destroyChart('spend');
+  var ctx1 = $('spendChart');
+  if (ctx1) {
+    var allMonths = {};
+    for (var i = 0; i < S.costs.length; i++) { allMonths[S.costs[i].month] = true; }
+    var mKeys = Object.keys(allMonths).sort();
+    var mSpend = {};
+    for (var i = 0; i < S.costs.length; i++) { mSpend[S.costs[i].month] = (mSpend[S.costs[i].month]||0) + S.costs[i].amt; }
+
+    CK.spend = new Chart(ctx1, {
+      type: 'bar', data: { labels: mKeys.map(monthLabel), datasets: [{ data: mKeys.map(function(m) { return mSpend[m]||0; }), backgroundColor: '#0f3d2e88', borderColor: '#0f3d2e', borderWidth: 1, borderRadius: 3 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: function(v) { return '$'+v.toLocaleString(); } } } } }
+    });
+  }
+
+  // Cost share pie
+  destroyChart('share');
+  var ctx2 = $('shareChart');
+  if (ctx2) {
+    var labels2 = Object.keys(platSpend);
+    if (labels2.length > 0) {
+      CK.share = new Chart(ctx2, {
+        type: 'doughnut', data: { labels: labels2, datasets: [{ data: labels2.map(function(l) { return platSpend[l]; }), backgroundColor: ['#0f3d2e','#e8913a','#1a5c44','#d4a843'], borderWidth: 2, borderColor: '#fff' }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } }, tooltip: { callbacks: { label: function(ctx) { return ctx.label+': '+fmt(ctx.parsed); } } } } }
+      });
+    }
+  }
+}
+
+// ============================================================
+// TAB SWITCHING
+// ============================================================
+function switchTab(name, btn) {
+  var tabs = document.querySelectorAll('.tab');
+  for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+  var contents = document.querySelectorAll('.tab-content');
+  for (var i = 0; i < contents.length; i++) contents[i].classList.remove('active');
+  $('tab-'+name).classList.add('active');
+  btn.classList.add('active');
+  setTimeout(function() {
+    if (name === 'consolidation') renderConsolidation();
+    if (name === 'campaigns') renderCampaignView();
+    if (name === 'costs') renderPlatformChart();
+    if (name === 'overview') renderOverview();
+  }, 50);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+load(function() {
+  var el = document.getElementById('load-status');
+  if (el && S.daily.length > 0) {
+    el.textContent = 'Connected — ' + S.daily.length + ' entries, ' + S.costs.length + ' cost records loaded';
+    el.style.color = '#2e7d32';
+  } else if (el && S.daily.length === 0 && S.costs.length === 0) {
+    el.textContent = 'Connected — no data found. Add entries above.';
+  }
+  renderAll();
+});
+</script>
+</body>
+</html>
