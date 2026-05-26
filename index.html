@@ -1136,7 +1136,7 @@ function renderConsolidation() {
       return ' <span style="font-size:9px;color:' + color + '">' + arrow + Math.abs(pct).toFixed(1) + '%</span>';
     }
 
-    var html = '<table class="tbl"><thead><tr><th>Period</th><th class="col-lp">LP Recs</th><th class="col-lp">LP Cost</th><th class="col-v">V Recs</th><th class="col-v">V Cost</th><th class="col-rm">RM Recs</th><th class="col-rm">RM Cost</th><th class="col-sum">Clean Recs</th><th class="col-sum">Total Cost</th><th class="col-sum">Blended $/Rec</th><th>Camps</th></tr></thead><tbody>';
+    var html = '<table class="tbl"><thead><tr><th>Period</th><th class="col-lp">LP Recs</th><th class="col-lp">LP Cost</th><th class="col-v">V Recs</th><th class="col-v">V Cost</th><th class="col-rm">RM Recs</th><th class="col-rm">RM Cost</th><th class="col-sum">Clean Recs</th><th class="col-sum">Total Cost</th><th class="col-sum">Blended $/Rec</th><th class="col-sum">vs Target</th><th>Camps</th></tr></thead><tbody>';
     for (var i = 0; i < rowData.length; i++) {
       var r = rowData[i];
       var prev = i < rowData.length - 1 ? rowData[i + 1] : null; // keys are reverse-sorted, so i+1 is the prior period
@@ -1151,6 +1151,18 @@ function renderConsolidation() {
       html += '<td class="sum-cell" style="text-align:right">' + (r.cleanRecs > 0 ? r.cleanRecs.toLocaleString() + wowBadge(r.cleanRecs, prev ? prev.cleanRecs : 0) : d) + '</td>';
       html += '<td class="sum-cell" style="text-align:right">' + (r.totalCost > 0 ? fmt(r.totalCost) + wowBadgeInv(r.totalCost, prev ? prev.totalCost : 0) : d) + '</td>';
       html += '<td class="sum-cell" style="text-align:right">' + (r.blended > 0 ? fmtBlended(r.blended) + wowBadgeInv(r.blended, prev ? prev.blended : 0) : d) + '</td>';
+      // % from benchmark
+      var vsTarget = '';
+      if (r.blended > 0) {
+        var pctFromTarget = ((r.blended - BLENDED_TARGET) / BLENDED_TARGET) * 100;
+        var cls = r.blended <= BLENDED_WARN ? 'bm-good' : r.blended <= BLENDED_TARGET ? 'bm-warn' : 'bm-bad';
+        if (pctFromTarget <= 0) {
+          vsTarget = '<span class="' + cls + '">' + Math.abs(pctFromTarget).toFixed(1) + '% under</span>';
+        } else {
+          vsTarget = '<span class="' + cls + '">' + pctFromTarget.toFixed(1) + '% over</span>';
+        }
+      } else { vsTarget = d; }
+      html += '<td class="sum-cell" style="text-align:center">' + vsTarget + '</td>';
       html += '<td>' + r.campCount + '</td></tr>';
     }
     html += '</tbody></table>';
@@ -1466,21 +1478,4 @@ function renderOverview() {
   for (var i = 0; i < qDaily.length; i++) {
     var de = qDaily[i];
     if (de.lp > 0) platRecs['Land Portal'] = (platRecs['Land Portal']||0) + de.lp;
-    if (de.v > 0) platRecs['Versium'] = (platRecs['Versium']||0) + de.v;
-    if (de.rm > 0) platRecs['Readymode'] = (platRecs['Readymode']||0) + de.rm;
-    campSet[de.camp] = true;
-  }
-  var campCount = Object.keys(campSet).length;
-
-  var lpR = platRecs['Land Portal'] || 0;
-  var vR = platRecs['Versium'] || 0;
-  var rmR = platRecs['Readymode'] || 0;
-  var lpS = platSpend['Land Portal'] || 0;
-  var vS = platSpend['Versium'] || 0;
-  var rmS = platSpend['Readymode'] || 0;
-
-  var lpCpr = lpR > 0 && lpS > 0 ? lpS / lpR : 0;
-  var vCpr = vR > 0 && vS > 0 ? vS / vR : 0;
-  var rmCpr = rmR > 0 && rmS > 0 ? rmS / rmR : 0;
-  var cleanRecs = lpR - rmR;
-  var blendedCpr = cleanRecs > 0 && total
+    
