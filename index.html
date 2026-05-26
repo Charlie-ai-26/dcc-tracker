@@ -739,11 +739,28 @@ function consolidate(period, fromDate, toDate) {
         }
       }
     } else if (period === 'weekly') {
-      var lastDay = new Date(parseInt(c.month.substring(0,4)), parseInt(c.month.substring(5,7)), 0);
-      var ld = lastDay.toISOString().split('T')[0];
-      ck = getWeekKey(ld);
-      if (!groups[ck]) groups[ck] = { records: 0, byCamp: {}, byPlat: {}, costByPlat: {} };
-      groups[ck].costByPlat[c.plat] = (groups[ck].costByPlat[c.plat] || 0) + c.amt;
+      // Spread monthly cost across all weeks that have entries in this month, proportional to platform records
+      var weekRecs = {}; // { weekKey: platformRecords }
+      var totalPlatRecs = 0;
+      for (var j = 0; j < filtered.length; j++) {
+        var bm = filtered[j].bm || getMonthKey(filtered[j].date);
+        if (bm === c.month) {
+          var wk = getWeekKey(filtered[j].date);
+          var pRecs = 0;
+          if (c.plat === 'Land Portal') pRecs = filtered[j].lp || 0;
+          else if (c.plat === 'Versium') pRecs = filtered[j].v || 0;
+          else if (c.plat === 'Readymode') pRecs = filtered[j].rm || 0;
+          weekRecs[wk] = (weekRecs[wk] || 0) + pRecs;
+          totalPlatRecs += pRecs;
+        }
+      }
+      var wkKeys = Object.keys(weekRecs);
+      for (var w = 0; w < wkKeys.length; w++) {
+        var wKey = wkKeys[w];
+        var share = totalPlatRecs > 0 ? weekRecs[wKey] / totalPlatRecs : 1 / wkKeys.length;
+        if (!groups[wKey]) groups[wKey] = { records: 0, byCamp: {}, byPlat: {}, costByPlat: {} };
+        groups[wKey].costByPlat[c.plat] = (groups[wKey].costByPlat[c.plat] || 0) + (c.amt * share);
+      }
     } else if (period === 'monthly') {
       ck = c.month;
       if (!groups[ck]) groups[ck] = { records: 0, byCamp: {}, byPlat: {}, costByPlat: {} };
@@ -1443,15 +1460,4 @@ function renderOverview() {
     '<div class="kpi-card"><div class="kpi-label">Land Portal</div><div class="kpi-value">' + (lpR > 0 ? fmtK(lpR) + ' recs' : '—') + '</div><div class="kpi-sub">' + (lpCpr > 0 ? '$' + lpCpr.toFixed(4) + '/rec | ' + fmt(lpS) : 'No cost data') + '</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">Versium</div><div class="kpi-value">' + (vR > 0 ? fmtK(vR) + ' recs' : '—') + '</div><div class="kpi-sub">' + (vCpr > 0 ? '$' + vCpr.toFixed(4) + '/rec | ' + fmt(vS) : 'No cost data') + '</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">Readymode</div><div class="kpi-value">' + (rmR > 0 ? fmtK(rmR) + ' recs' : '—') + '</div><div class="kpi-sub">' + (rmCpr > 0 ? '$' + rmCpr.toFixed(4) + '/rec | ' + fmt(rmS) : 'No cost data') + '</div></div>' +
-    '<div class="kpi-card"><div class="kpi-label">Blended $/Record</div><div class="kpi-value">' + (blendedCpr > 0 ? '$' + blendedCpr.toFixed(4) : '—') + '</div><div class="kpi-sub">' + (cleanRecs > 0 ? fmtK(cleanRecs) + ' clean records' : 'No data') + '</div></div>' +
-    '<div class="kpi-card"><div class="kpi-label">Campaigns</div><div class="kpi-value">' + (campCount || DATA_CAMPAIGNS.length) + '</div><div class="kpi-sub">' + (campCount > 0 ? 'With recorded data' : 'From Command Center') + '</div></div>';
-
-  // Spend chart
-  destroyChart('spend');
-  var ctx1 = $('spendChart');
-  if (ctx1) {
-    var allMonths = {};
-    for (var i = 0; i < S.costs.length; i++) { allMonths[S.costs[i].month] = true; }
-    var mKeys = Object.keys(allMonths).sort();
-    var mSpend = {};
-    for (var i = 0; i < S.costs.length; i++) { mSpend[S.costs[i].month] = (mSpend[S.cos
+    '<div class="kpi-card"><div class="kpi-label">Blended $/Record</div
