@@ -255,7 +255,7 @@ h3 { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; }
             <th rowspan="2">Date</th><th rowspan="2">Campaign</th><th rowspan="2">Billing<br>Month</th>
             <th colspan="3" class="col-grp col-lp">Land Portal</th>
             <th colspan="3" class="col-grp col-v">Versium</th>
-            <th colspan="3" class="col-grp col-rm">Readymode</th>
+            <th colspan="3" class="col-grp col-rm">Readymode (Scrubbed off)</th>
             <th colspan="3" class="col-grp col-sum">Summary</th>
             <th rowspan="2">By</th><th rowspan="2"></th>
           </tr>
@@ -725,13 +725,14 @@ function consolidate(period, fromDate, toDate) {
     e = filtered[i];
     k = keyFn(e.date);
     if (!groups[k]) groups[k] = { records: 0, byCamp: {}, byPlat: {}, costByPlat: {} };
-    var eLp = e.lp || 0, eV = e.v || 0, eRm = e.rm || 0;
-    var eTotal = eLp + eV + eRm;
+    var eLp = e.lp || 0, eV = e.v || 0, eClean = e.rm || 0;
+    var eScrub = Math.max(0, eLp - eClean);
+    var eTotal = eLp + eV + eScrub;
     groups[k].records += eTotal;
     groups[k].byCamp[e.camp] = (groups[k].byCamp[e.camp] || 0) + eTotal;
     if (eLp > 0) groups[k].byPlat['Land Portal'] = (groups[k].byPlat['Land Portal'] || 0) + eLp;
     if (eV > 0) groups[k].byPlat['Versium'] = (groups[k].byPlat['Versium'] || 0) + eV;
-    if (eRm > 0) groups[k].byPlat['Readymode'] = (groups[k].byPlat['Readymode'] || 0) + eRm;
+    if (eScrub > 0) groups[k].byPlat['Readymode'] = (groups[k].byPlat['Readymode'] || 0) + eScrub;
   }
 
   // Filter costs by date range (use first day of month for comparison)
@@ -779,7 +780,7 @@ function consolidate(period, fromDate, toDate) {
           var pRecs = 0;
           if (c.plat === 'Land Portal') pRecs = filtered[j].lp || 0;
           else if (c.plat === 'Versium') pRecs = filtered[j].v || 0;
-          else if (c.plat === 'Readymode') pRecs = filtered[j].rm || 0;
+          else if (c.plat === 'Readymode') pRecs = Math.max(0, (filtered[j].lp || 0) - (filtered[j].rm || 0));
           weekRecs[wk] = (weekRecs[wk] || 0) + pRecs;
           totalPlatRecs += pRecs;
         }
@@ -862,7 +863,6 @@ function addDaily() {
   var lp = parseInt($('d-lp').value) || 0;
   var v = parseInt($('d-v').value) || 0;
   var clean = parseInt($('d-rm').value) || 0;
-  var rm = (lp + v) - clean; if (rm < 0) rm = 0;
   var by = $('d-by').value.trim();
   var notes = $('d-notes').value;
   if (!date || !camp) return alert('Enter date and campaign.');
@@ -870,7 +870,7 @@ function addDaily() {
   if (!by) return alert('Enter your name in the "Entered By" field.');
 
   sb.from('dcc_daily_entries').insert({
-    entry_date: date, campaign: camp, billing_month: bm, lp_records: lp, v_records: v, rm_records: rm, entered_by: by, notes: notes
+    entry_date: date, campaign: camp, billing_month: bm, lp_records: lp, v_records: v, rm_records: clean, entered_by: by, notes: notes
   }).select().then(function(res) {
     if (res.error) return alert('Error saving: ' + res.error.message);
     var r = res.data[0];
@@ -910,7 +910,8 @@ function renderDailyTable() {
     if (!monthTotals[mk]) monthTotals[mk] = { lp:0, v:0, rm:0 };
     monthTotals[mk].lp += (S.daily[i].lp || 0);
     monthTotals[mk].v += (S.daily[i].v || 0);
-    monthTotals[mk].rm += (S.daily[i].rm || 0);
+    var scrub = Math.max(0, (S.daily[i].lp || 0) - (S.daily[i].rm || 0));
+    monthTotals[mk].rm += scrub;
   }
 
   var html = '';
@@ -928,14 +929,14 @@ function renderDailyTable() {
     var vRate = (mt.v > 0 && vCost > 0) ? vCost / mt.v : 0;
     var rmRate = (mt.rm > 0 && rmCost > 0) ? rmCost / mt.rm : 0;
 
-    // Allocated costs for this entry
-    var eLp = e.lp || 0, eV = e.v || 0, eRm = e.rm || 0;
+    // e.rm now stores clean records directly; scrubbed = LP - clean
+    var eLp = e.lp || 0, eV = e.v || 0, eClean = e.rm || 0;
+    var eScrub = Math.max(0, eLp - eClean);
     var lpAlloc = (mt.lp > 0 && eLp > 0) ? (eLp / mt.lp) * lpCost : 0;
     var vAlloc = (mt.v > 0 && eV > 0) ? (eV / mt.v) * vCost : 0;
-    var rmAlloc = (mt.rm > 0 && eRm > 0) ? (eRm / mt.rm) * rmCost : 0;
+    var rmAlloc = (mt.rm > 0 && eScrub > 0) ? (eScrub / mt.rm) * rmCost : 0;
     var totalCost = lpAlloc + vAlloc + rmAlloc;
-    var cleanRecs = (eLp + eV) - eRm;
-    if (cleanRecs < 0) cleanRecs = 0;
+    var cleanRecs = eClean;
     var blended = cleanRecs > 0 ? totalCost / cleanRecs : 0;
 
     var d = '<span class="muted">—</span>';
@@ -949,7 +950,7 @@ function renderDailyTable() {
     html += '<td class="v-cell" style="text-align:right">' + (eV > 0 ? eV.toLocaleString() : d) + '</td>';
     html += '<td class="v-cell" style="text-align:right">' + (vAlloc > 0 ? fmt(vAlloc) : d) + '</td>';
     html += '<td class="v-cell" style="text-align:right">' + (vRate > 0 ? '$' + vRate.toFixed(4) : d) + '</td>';
-    html += '<td class="rm-cell" style="text-align:right">' + (eLp > 0 ? eRm.toLocaleString() : d) + '</td>';
+    html += '<td class="rm-cell" style="text-align:right">' + (eScrub > 0 ? eScrub.toLocaleString() : d) + '</td>';
     html += '<td class="rm-cell" style="text-align:right">' + (rmAlloc > 0 ? fmt(rmAlloc) : d) + '</td>';
     html += '<td class="rm-cell" style="text-align:right">' + (rmRate > 0 ? '$' + rmRate.toFixed(4) : d) + '</td>';
     html += '<td class="sum-cell" style="text-align:right">' + (cleanRecs > 0 ? cleanRecs.toLocaleString() : d) + '</td>';
@@ -1105,7 +1106,7 @@ function renderConsolidation() {
       var vC = (g.costByPlat && g.costByPlat['Versium']) || 0;
       var rmC = (g.costByPlat && g.costByPlat['Readymode']) || 0;
       var totalCost = lpC + vC + rmC;
-      var cleanRecs = (lpR + vR) - rmR; if (cleanRecs < 0) cleanRecs = 0;
+      var cleanRecs = lpR - rmR; if (cleanRecs < 0) cleanRecs = 0;
       var blended = cleanRecs > 0 ? totalCost / cleanRecs : 0;
       var campCount = Object.keys(g.byCamp).length;
 
@@ -1137,7 +1138,7 @@ function renderConsolidation() {
       return ' <span style="font-size:9px;color:' + color + '">' + arrow + Math.abs(pct).toFixed(1) + '%</span>';
     }
 
-    var html = '<table class="tbl"><thead><tr><th>Period</th><th class="col-lp">LP Recs</th><th class="col-lp">LP Cost</th><th class="col-v">V Recs</th><th class="col-v">V Cost</th><th class="col-rm">RM Recs</th><th class="col-rm">RM Cost</th><th class="col-sum">Clean Recs</th><th class="col-sum">Total Cost</th><th class="col-sum">Blended $/Rec</th><th class="col-sum">vs Target</th><th>Camps</th></tr></thead><tbody>';
+    var html = '<table class="tbl"><thead><tr><th>Period</th><th class="col-lp">LP Recs</th><th class="col-lp">LP Cost</th><th class="col-v">V Recs</th><th class="col-v">V Cost</th><th class="col-rm">RM Scrubbed</th><th class="col-rm">RM Cost</th><th class="col-sum">Clean Recs</th><th class="col-sum">Total Cost</th><th class="col-sum">Blended $/Rec</th><th class="col-sum">vs Target</th><th>Camps</th></tr></thead><tbody>';
     for (var i = 0; i < rowData.length; i++) {
       var r = rowData[i];
       var prev = i < rowData.length - 1 ? rowData[i + 1] : null; // keys are reverse-sorted, so i+1 is the prior period
@@ -1191,7 +1192,7 @@ function renderRecordsTrend(groups) {
       labels: labels, datasets: [
         { label: 'Land Portal', data: keys.map(function(k) { return (groups[k].byPlat && groups[k].byPlat['Land Portal']) || 0; }), borderColor: '#1a5c44', fill: false, tension: 0.3, pointRadius: 3 },
         { label: 'Versium', data: keys.map(function(k) { return (groups[k].byPlat && groups[k].byPlat['Versium']) || 0; }), borderColor: '#0f3d2e', fill: false, tension: 0.3, pointRadius: 3 },
-        { label: 'Readymode', data: keys.map(function(k) { return (groups[k].byPlat && groups[k].byPlat['Readymode']) || 0; }), borderColor: '#e8913a', fill: false, tension: 0.3, pointRadius: 3 }
+        { label: 'Readymode (Scrubbed off)', data: keys.map(function(k) { return (groups[k].byPlat && groups[k].byPlat['Readymode']) || 0; }), borderColor: '#e8913a', fill: false, tension: 0.3, pointRadius: 3 }
       ]
     }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } }, scales: { y: { beginAtZero: true } } }
   });
@@ -1215,7 +1216,7 @@ function renderSpendTrend(groups) {
       datasets: [
         { label: 'Land Portal', data: keys.map(function(k) { return (groups[k].costByPlat && groups[k].costByPlat['Land Portal']) || 0; }), backgroundColor: '#1a5c4488', borderRadius: 3, stack: 'cost' },
         { label: 'Versium', data: keys.map(function(k) { return (groups[k].costByPlat && groups[k].costByPlat['Versium']) || 0; }), backgroundColor: '#0f3d2e88', borderRadius: 3, stack: 'cost' },
-        { label: 'Readymode', data: keys.map(function(k) { return (groups[k].costByPlat && groups[k].costByPlat['Readymode']) || 0; }), backgroundColor: '#e8913a88', borderRadius: 3, stack: 'cost' }
+        { label: 'Readymode (Scrubbed off)', data: keys.map(function(k) { return (groups[k].costByPlat && groups[k].costByPlat['Readymode']) || 0; }), backgroundColor: '#e8913a88', borderRadius: 3, stack: 'cost' }
       ]
     }, options: {
       responsive: true, maintainAspectRatio: false,
@@ -1240,7 +1241,8 @@ function renderCampaignView() {
   var campPlatRecs = {};
   for (var i = 0; i < mDaily.length; i++) {
     var e = mDaily[i];
-    var eLp = e.lp || 0, eV = e.v || 0, eRm = e.rm || 0;
+    var eLp = e.lp || 0, eV = e.v || 0, eClean = e.rm || 0;
+    var eScrub = Math.max(0, eLp - eClean);
     if (!campPlatRecs[e.camp]) campPlatRecs[e.camp] = {};
     if (eLp > 0) {
       platTotalRecs['Land Portal'] = (platTotalRecs['Land Portal']||0) + eLp;
@@ -1250,9 +1252,9 @@ function renderCampaignView() {
       platTotalRecs['Versium'] = (platTotalRecs['Versium']||0) + eV;
       campPlatRecs[e.camp]['Versium'] = (campPlatRecs[e.camp]['Versium']||0) + eV;
     }
-    if (eRm > 0) {
-      platTotalRecs['Readymode'] = (platTotalRecs['Readymode']||0) + eRm;
-      campPlatRecs[e.camp]['Readymode'] = (campPlatRecs[e.camp]['Readymode']||0) + eRm;
+    if (eScrub > 0) {
+      platTotalRecs['Readymode'] = (platTotalRecs['Readymode']||0) + eScrub;
+      campPlatRecs[e.camp]['Readymode'] = (campPlatRecs[e.camp]['Readymode']||0) + eScrub;
     }
   }
 
@@ -1278,8 +1280,8 @@ function renderCampaignView() {
     var rmAlloc = (platTotalRecs['Readymode'] > 0 && rmR > 0) ? (rmR / platTotalRecs['Readymode']) * rmCostTotal : 0;
     var totalCost = lpAlloc + vAlloc + rmAlloc;
 
-    // Clean records = (LP + V) - RM scrubbed
-    var cleanRecs = (lpR + vR) - rmR;
+    // Clean records = LP - RM scrubbed
+    var cleanRecs = lpR - rmR;
     if (cleanRecs < 0) cleanRecs = 0;
 
     // Blended $/rec
@@ -1326,7 +1328,7 @@ function renderCampaignView() {
     thtml += '<th rowspan="2">Campaign</th><th rowspan="2">Type</th>';
     thtml += '<th colspan="3" class="col-grp col-lp">Land Portal</th>';
     thtml += '<th colspan="3" class="col-grp col-v">Versium</th>';
-    thtml += '<th colspan="3" class="col-grp col-rm">Readymode</th>';
+    thtml += '<th colspan="3" class="col-grp col-rm">Readymode (Scrubbed off)</th>';
     thtml += '<th colspan="3" class="col-grp col-sum">Summary</th>';
     thtml += '</tr><tr>';
     thtml += '<th class="col-lp" style="border-bottom-width:1px">Recs</th><th class="col-lp" style="border-bottom-width:1px">Cost</th><th class="col-lp" style="border-bottom-width:1px">$/Rec</th>';
@@ -1431,9 +1433,9 @@ function renderEffChart(platTotalRecs, lpCost, vCost, rmCost, combinedCost, tota
   if (platTotalRecs['Versium'] > 0 && vCost > 0)
     effData.push({ name: 'Versium', cpr: vCost / platTotalRecs['Versium'], color: '#0f3d2e' });
   if (platTotalRecs['Readymode'] > 0 && rmCost > 0)
-    effData.push({ name: 'Readymode', cpr: rmCost / platTotalRecs['Readymode'], color: '#e8913a' });
+    effData.push({ name: 'RM (Scrubbed)', cpr: rmCost / platTotalRecs['Readymode'], color: '#e8913a' });
 
-  var cleanRecs = totalLP + (platTotalRecs['Versium'] || 0) - (platTotalRecs['Readymode'] || 0);
+  var cleanRecs = totalLP - (platTotalRecs['Readymode'] || 0);
   if (cleanRecs > 0 && combinedCost > 0)
     effData.push({ name: 'Blended', cpr: combinedCost / cleanRecs, color: '#d4a843' });
 
@@ -1468,12 +1470,4 @@ function renderOverview() {
     var c = S.costs[i];
     if (months.indexOf(c.month) >= 0) {
       platSpend[c.plat] = (platSpend[c.plat]||0) + c.amt;
-      totalSpend += c.amt;
-    }
-  }
-
-  // Quarter records
-  var qDaily = S.daily.filter(function(e) { return months.indexOf(getMonthKey(e.date)) >= 0; });
-  var platRecs = {};
-  var campSet = {};
-  for (var i = 0; i < qDail
+    
