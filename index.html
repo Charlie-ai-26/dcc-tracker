@@ -474,7 +474,7 @@ var CC_CAMPAIGNS = [
   {n:"Foundational Land Company",s:"Active",t:"Core",ty:"Direct"},
   {n:"Freedom Development Partners",s:"Active",t:"Platform",ty:"Direct"},
   {n:"GCS Land Investments",s:"Active",t:"Platform",ty:"Direct"},
-  {n:"GF Development",s:"Active",t:"Platform",ty:"Robin"},
+  {n:"GF Development",s:"Active",t:"Platform",ty:"Direct"},
   {n:"H4 Land Sales",s:"Active",t:"Platform",ty:"Direct"},
   {n:"Harmony Investing",s:"Inactive",t:"—",ty:"Direct"},
   {n:"Holland Matthews",s:"Active",t:"Platform",ty:"Direct"},
@@ -1287,15 +1287,16 @@ function renderCampaignView() {
     // Blended $/rec
     var blended = cleanRecs > 0 ? totalCost / cleanRecs : 0;
 
-    // Find campaign type
-    var campType = '—';
+    // Find campaign type and tier
+    var campType = '—', campTier = '—';
     for (var j = 0; j < CC_CAMPAIGNS.length; j++) {
-      if (CC_CAMPAIGNS[j].n === name) { campType = CC_CAMPAIGNS[j].ty || 'Direct'; break; }
+      if (CC_CAMPAIGNS[j].n === name) { campType = CC_CAMPAIGNS[j].ty || 'Direct'; campTier = CC_CAMPAIGNS[j].t || '—'; break; }
     }
 
     rows.push([
       name,
       campType,
+      campTier,
       lpR > 0 ? lpR.toLocaleString() : '—',
       lpAlloc > 0 ? fmt(lpAlloc) : '—',
       lpCpr > 0 ? '$' + lpCpr.toFixed(4) : '—',
@@ -1318,14 +1319,14 @@ function renderCampaignView() {
   } else {
     // Sort rows by total cost descending (column 12)
     rows.sort(function(a,b) {
-      var av = typeof a[12] === 'string' ? parseFloat(a[12].replace(/[$,]/g,'')) || 0 : (a[12] || 0);
-      var bv = typeof b[12] === 'string' ? parseFloat(b[12].replace(/[$,]/g,'')) || 0 : (b[12] || 0);
+      var av = typeof a[13] === 'string' ? parseFloat(a[13].replace(/[$,]/g,'')) || 0 : (a[13] || 0);
+      var bv = typeof b[13] === 'string' ? parseFloat(b[13].replace(/[$,]/g,'')) || 0 : (b[13] || 0);
       return bv - av;
     });
     var d = '<span class="muted">—</span>';
     var thtml = '<div style="overflow-x:auto;"><table class="tbl" id="camp-tbl"><thead>';
     thtml += '<tr>';
-    thtml += '<th rowspan="2">Campaign</th><th rowspan="2">Type</th>';
+    thtml += '<th rowspan="2">Campaign</th><th rowspan="2">Type</th><th rowspan="2">Tier</th>';
     thtml += '<th colspan="3" class="col-grp col-lp">Land Portal</th>';
     thtml += '<th colspan="3" class="col-grp col-v">Versium</th>';
     thtml += '<th colspan="3" class="col-grp col-rm">Readymode (Scrubbed off)</th>';
@@ -1339,21 +1340,23 @@ function renderCampaignView() {
     for (var ri = 0; ri < rows.length; ri++) {
       var r = rows[ri];
       var typeBadge = r[1] === 'Robin' ? '<span class="badge b-orange">Robin</span>' : '<span class="badge b-blue">Direct</span>';
+      var tierBadge = r[2] === 'Partnership' ? '<span class="badge" style="background:#d4a84322;color:#9a7b2f">Partnership</span>' : r[2] === 'Core' ? '<span class="badge" style="background:#0f3d2e22;color:#0f3d2e">Core</span>' : r[2] === 'Platform' ? '<span class="badge" style="background:#1a5c4422;color:#1a5c44">Platform</span>' : '<span class="muted">—</span>';
       thtml += '<tr>';
       thtml += '<td style="font-weight:600">' + r[0] + '</td>';
       thtml += '<td>' + typeBadge + '</td>';
-      thtml += '<td class="lp-cell" style="text-align:right">' + (r[2] !== '—' ? r[2] : d) + '</td>';
+      thtml += '<td>' + tierBadge + '</td>';
       thtml += '<td class="lp-cell" style="text-align:right">' + (r[3] !== '—' ? r[3] : d) + '</td>';
       thtml += '<td class="lp-cell" style="text-align:right">' + (r[4] !== '—' ? r[4] : d) + '</td>';
-      thtml += '<td class="v-cell" style="text-align:right">' + (r[5] !== '—' ? r[5] : d) + '</td>';
+      thtml += '<td class="lp-cell" style="text-align:right">' + (r[5] !== '—' ? r[5] : d) + '</td>';
       thtml += '<td class="v-cell" style="text-align:right">' + (r[6] !== '—' ? r[6] : d) + '</td>';
       thtml += '<td class="v-cell" style="text-align:right">' + (r[7] !== '—' ? r[7] : d) + '</td>';
-      thtml += '<td class="rm-cell" style="text-align:right">' + (r[8] !== '—' ? r[8] : d) + '</td>';
+      thtml += '<td class="v-cell" style="text-align:right">' + (r[8] !== '—' ? r[8] : d) + '</td>';
       thtml += '<td class="rm-cell" style="text-align:right">' + (r[9] !== '—' ? r[9] : d) + '</td>';
       thtml += '<td class="rm-cell" style="text-align:right">' + (r[10] !== '—' ? r[10] : d) + '</td>';
-      thtml += '<td class="sum-cell" style="text-align:right">' + (r[11] !== '—' ? r[11] : d) + '</td>';
+      thtml += '<td class="rm-cell" style="text-align:right">' + (r[11] !== '—' ? r[11] : d) + '</td>';
       thtml += '<td class="sum-cell" style="text-align:right">' + (r[12] !== '—' ? r[12] : d) + '</td>';
-      thtml += '<td class="sum-cell" style="text-align:right">' + fmtBlended(r[13]) + '</td>';
+      thtml += '<td class="sum-cell" style="text-align:right">' + (r[13] !== '—' ? r[13] : d) + '</td>';
+      thtml += '<td class="sum-cell" style="text-align:right">' + fmtBlended(r[14]) + '</td>';
       thtml += '</tr>';
     }
     thtml += '</tbody></table></div>';
@@ -1470,4 +1473,106 @@ function renderOverview() {
     var c = S.costs[i];
     if (months.indexOf(c.month) >= 0) {
       platSpend[c.plat] = (platSpend[c.plat]||0) + c.amt;
-    
+      totalSpend += c.amt;
+    }
+  }
+
+  // Quarter records
+  var qDaily = S.daily.filter(function(e) { return months.indexOf(getMonthKey(e.date)) >= 0; });
+  var platRecs = {};
+  var campSet = {};
+  for (var i = 0; i < qDaily.length; i++) {
+    var de = qDaily[i];
+    var deScrub = Math.max(0, (de.lp || 0) - (de.rm || 0));
+    if (de.lp > 0) platRecs['Land Portal'] = (platRecs['Land Portal']||0) + de.lp;
+    if (de.v > 0) platRecs['Versium'] = (platRecs['Versium']||0) + de.v;
+    if (deScrub > 0) platRecs['Readymode'] = (platRecs['Readymode']||0) + deScrub;
+    campSet[de.camp] = true;
+  }
+  var campCount = Object.keys(campSet).length;
+
+  var lpR = platRecs['Land Portal'] || 0;
+  var vR = platRecs['Versium'] || 0;
+  var rmR = platRecs['Readymode'] || 0;
+  var lpS = platSpend['Land Portal'] || 0;
+  var vS = platSpend['Versium'] || 0;
+  var rmS = platSpend['Readymode'] || 0;
+
+  var lpCpr = lpR > 0 && lpS > 0 ? lpS / lpR : 0;
+  var vCpr = vR > 0 && vS > 0 ? vS / vR : 0;
+  var rmCpr = rmR > 0 && rmS > 0 ? rmS / rmR : 0;
+  var cleanRecs = lpR - rmR;
+  var blendedCpr = cleanRecs > 0 && totalSpend > 0 ? totalSpend / cleanRecs : 0;
+
+  $('kpis').innerHTML =
+    '<div class="kpi-card"><div class="kpi-label">Total Spend (' + S.quarter + ')</div><div class="kpi-value">' + fmt(totalSpend) + '</div><div class="kpi-sub">All platforms combined</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">Land Portal</div><div class="kpi-value">' + (lpR > 0 ? fmtK(lpR) + ' recs' : '—') + '</div><div class="kpi-sub">' + (lpCpr > 0 ? '$' + lpCpr.toFixed(4) + '/rec | ' + fmt(lpS) : 'No cost data') + '</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">Versium</div><div class="kpi-value">' + (vR > 0 ? fmtK(vR) + ' recs' : '—') + '</div><div class="kpi-sub">' + (vCpr > 0 ? '$' + vCpr.toFixed(4) + '/rec | ' + fmt(vS) : 'No cost data') + '</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">Readymode (Scrubbed off)</div><div class="kpi-value">' + (rmR > 0 ? fmtK(rmR) + ' recs' : '—') + '</div><div class="kpi-sub">' + (rmCpr > 0 ? '$' + rmCpr.toFixed(4) + '/rec | ' + fmt(rmS) : 'No cost data') + '</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">Blended $/Record <span style="font-size:9px;color:#888">(target: $' + BLENDED_TARGET.toFixed(2) + ')</span></div><div class="kpi-value ' + blendedClass(blendedCpr) + '">' + (blendedCpr > 0 ? blendedDot(blendedCpr) + '$' + blendedCpr.toFixed(4) : '—') + '</div><div class="kpi-sub">' + (cleanRecs > 0 ? fmtK(cleanRecs) + ' clean records' : 'No data') + '</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">Campaigns</div><div class="kpi-value">' + (campCount || DATA_CAMPAIGNS.length) + '</div><div class="kpi-sub">' + (campCount > 0 ? 'With recorded data' : 'From Command Center') + '</div></div>';
+
+  // Spend chart
+  destroyChart('spend');
+  var ctx1 = $('spendChart');
+  if (ctx1) {
+    var allMonths = {};
+    for (var i = 0; i < S.costs.length; i++) { allMonths[S.costs[i].month] = true; }
+    var mKeys = Object.keys(allMonths).sort();
+    var mSpend = {};
+    for (var i = 0; i < S.costs.length; i++) { mSpend[S.costs[i].month] = (mSpend[S.costs[i].month]||0) + S.costs[i].amt; }
+
+    CK.spend = new Chart(ctx1, {
+      type: 'bar', data: { labels: mKeys.map(monthLabel), datasets: [{ data: mKeys.map(function(m) { return mSpend[m]||0; }), backgroundColor: '#0f3d2e88', borderColor: '#0f3d2e', borderWidth: 1, borderRadius: 3 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: function(v) { return '$'+v.toLocaleString(); } } } } }
+    });
+  }
+
+  // Cost share pie
+  destroyChart('share');
+  var ctx2 = $('shareChart');
+  if (ctx2) {
+    var labels2 = Object.keys(platSpend);
+    if (labels2.length > 0) {
+      CK.share = new Chart(ctx2, {
+        type: 'doughnut', data: { labels: labels2, datasets: [{ data: labels2.map(function(l) { return platSpend[l]; }), backgroundColor: ['#0f3d2e','#e8913a','#1a5c44','#d4a843'], borderWidth: 2, borderColor: '#fff' }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } }, tooltip: { callbacks: { label: function(ctx) { return ctx.label+': '+fmt(ctx.parsed); } } } } }
+      });
+    }
+  }
+}
+
+// ============================================================
+// TAB SWITCHING
+// ============================================================
+function switchTab(name, btn) {
+  var tabs = document.querySelectorAll('.tab');
+  for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+  var contents = document.querySelectorAll('.tab-content');
+  for (var i = 0; i < contents.length; i++) contents[i].classList.remove('active');
+  $('tab-'+name).classList.add('active');
+  btn.classList.add('active');
+  setTimeout(function() {
+    if (name === 'consolidation') renderConsolidation();
+    if (name === 'campaigns') renderCampaignView();
+    if (name === 'costs') renderPlatformChart();
+    if (name === 'overview') renderOverview();
+  }, 50);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+load(function() {
+  var el = document.getElementById('load-status');
+  if (el && S.daily.length > 0) {
+    el.textContent = 'Connected — ' + S.daily.length + ' entries, ' + S.costs.length + ' cost records loaded';
+    el.style.color = '#2e7d32';
+  } else if (el && S.daily.length === 0 && S.costs.length === 0) {
+    el.textContent = 'Connected — no data found. Add entries above.';
+  }
+  renderAll();
+});
+</script>
+</body>
+</html>
