@@ -486,8 +486,8 @@ var CC_CAMPAIGNS = [
   {n:"LandVault Ventures",s:"Active",t:"Platform",ty:"Direct"},
   {n:"LandX",s:"Active",t:"Platform",ty:"Direct"},
   {n:"Legacy Land LLC",s:"Active",t:"Platform",ty:"Direct"},
-  {n:"Lewis & Clark Land Holdings",s:"Active",t:"Core",ty:"Direct"},
-  {n:"Liberty Acres",s:"Active",t:"Partnership 200",ty:"Direct"},
+  {n:"Lewis & Clark Land Holdings",s:"Active",t:"Platform",ty:"Direct"},
+  {n:"Liberty Acres",s:"Active",t:"Partnership",ty:"Direct"},
   {n:"Lion Land Investment",s:"Active",t:"Core",ty:"Direct"},
   {n:"LQP",s:"Active",t:"Platform",ty:"Direct"},
   {n:"Lyam Land",s:"Active",t:"Core",ty:"Direct"},
@@ -500,18 +500,18 @@ var CC_CAMPAIGNS = [
   {n:"Ranch Marketers",s:"Active",t:"Platform",ty:"Direct"},
   {n:"RBI Properties",s:"Inactive",t:"Platform",ty:"Direct"},
   {n:"Ryan's Land Deals",s:"Inactive",t:"Platform",ty:"Direct"},
-  {n:"Sam Crego",s:"Active",t:"CRM Only",ty:"Direct"},
+  {n:"Sam Crego",s:"Active",t:"CC 40",ty:"Direct"},
   {n:"San Bernard Land Company",s:"Active",t:"Platform",ty:"Direct"},
   {n:"Seagrape Capital",s:"Active",t:"Platform",ty:"Direct"},
   {n:"Skylux Real Estate",s:"Active",t:"Platform",ty:"Robin"},
-  {n:"Tailored Acquisitions",s:"Active",t:"Platform",ty:"Direct"},
+  {n:"Tailored Acquisitions",s:"Active",t:"Platform",ty:"Robin"},
   {n:"Terra Firma Land",s:"Active",t:"Platform",ty:"Direct"},
   {n:"The Favorite Land Investment",s:"Active",t:"Platform",ty:"Robin"},
   {n:"Timberdoodle Land Company",s:"Active",t:"Core",ty:"Direct"},
   {n:"Unpaved Properties",s:"Active",t:"Platform",ty:"Direct"},
-  {n:"US Land Investors",s:"Active",t:"Platform",ty:"Direct"},
+  {n:"US Land Investors",s:"Active",t:"Platform",ty:"Robin"},
   {n:"Vacant Land Squad",s:"Active",t:"Platform",ty:"Direct"},
-  {n:"Wally's Land LLC",s:"Active",t:"Core",ty:"Direct"},
+  {n:"Wally's Land LLC",s:"Active",t:"Core",ty:"Robin"},
   {n:"Willow Capital Holdings",s:"Active",t:"Platform",ty:"Direct"}
 ];
 
@@ -1340,7 +1340,7 @@ function renderCampaignView() {
     for (var ri = 0; ri < rows.length; ri++) {
       var r = rows[ri];
       var typeBadge = r[1] === 'Robin' ? '<span class="badge b-orange">Robin</span>' : '<span class="badge b-blue">Direct</span>';
-      var tierBadge = r[2] === 'Partnership' ? '<span class="badge" style="background:#d4a84322;color:#9a7b2f">Partnership</span>' : r[2] === 'Core' ? '<span class="badge" style="background:#0f3d2e22;color:#0f3d2e">Core</span>' : r[2] === 'Platform' ? '<span class="badge" style="background:#1a5c4422;color:#1a5c44">Platform</span>' : '<span class="muted">—</span>';
+      var tierBadge = r[2] === 'Partnership' ? '<span class="badge" style="background:#d4a84322;color:#9a7b2f">Partnership</span>' : r[2] === 'Core' ? '<span class="badge" style="background:#0f3d2e22;color:#0f3d2e">Core</span>' : r[2] === 'Platform' ? '<span class="badge" style="background:#1a5c4422;color:#1a5c44">Platform</span>' : r[2] === 'CC 40' ? '<span class="badge" style="background:#3b82f622;color:#2563eb">CC 40</span>' : r[2] === 'CC 60' ? '<span class="badge" style="background:#3b82f622;color:#2563eb">CC 60</span>' : (r[2] && r[2] !== '—') ? '<span class="badge" style="background:#88888822;color:#666">' + r[2] + '</span>' : '<span class="muted">—</span>';
       thtml += '<tr>';
       thtml += '<td style="font-weight:600">' + r[0] + '</td>';
       thtml += '<td>' + typeBadge + '</td>';
@@ -1566,13 +1566,4 @@ function switchTab(name, btn) {
 load(function() {
   var el = document.getElementById('load-status');
   if (el && S.daily.length > 0) {
-    el.textContent = 'Connected — ' + S.daily.length + ' entries, ' + S.costs.length + ' cost records loaded';
-    el.style.color = '#2e7d32';
-  } else if (el && S.daily.length === 0 && S.costs.length === 0) {
-    el.textContent = 'Connected — no data found. Add entries above.';
-  }
-  renderAll();
-});
-</script>
-</body>
-</html>
+    el.textContent = 'Connecte
