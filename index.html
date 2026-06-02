@@ -417,6 +417,14 @@ h3 { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; }
         <p><strong>Use:</strong> Shows the true all-in cost to produce one usable lead record after all processing stages.</p>
       </div>
 
+      <div class="mbox" style="border-left-color:#2e7d32"><h4>Benchmark Color Indicators</h4>
+        <p>The Blended $/Record metric uses a three-color system to instantly flag cost efficiency against our $0.05 target.</p>
+        <p><span style="color:#2e7d32;font-weight:700">&#9679; Green (≤ $0.04)</span> — Under the warning threshold. Cost efficiency is strong — well below target. No action needed.</p>
+        <p><span style="color:#e65100;font-weight:700">&#9679; Yellow ($0.04 – $0.05)</span> — Between the warning threshold and target. Acceptable but approaching the ceiling. Monitor closely for upward trends.</p>
+        <p><span style="color:#c62828;font-weight:700">&#9679; Red (> $0.05)</span> — Over the $0.05 target. Data processing cost per clean record exceeds budget. Investigate which platform stage is driving cost up and whether record scrub rates or volume changes can bring it back in line.</p>
+        <p><strong>vs Target %:</strong> Shows how far above or below the $0.05 benchmark a given period or campaign is. Negative (under) is good; positive (over) flags risk.</p>
+      </div>
+
       <div class="mbox"><h4>Allocated Cost by Campaign</h4>
         <p><strong>Formula:</strong> For each platform: (Campaign's platform records ÷ Total platform records) × Platform spend = Allocated cost for that platform. Sum across platforms for total campaign cost.</p>
         <p><strong>Use:</strong> Identifies which campaigns consume the most cost per platform. Compare against tier price to flag margin risk.</p>
@@ -1566,4 +1574,13 @@ function switchTab(name, btn) {
 load(function() {
   var el = document.getElementById('load-status');
   if (el && S.daily.length > 0) {
-    el.textContent = 'Connecte
+    el.textContent = 'Connected — ' + S.daily.length + ' entries, ' + S.costs.length + ' cost records loaded';
+    el.style.color = '#2e7d32';
+  } else if (el && S.daily.length === 0 && S.costs.length === 0) {
+    el.textContent = 'Connected — no data found. Add entries above.';
+  }
+  renderAll();
+});
+</script>
+</body>
+</html>
