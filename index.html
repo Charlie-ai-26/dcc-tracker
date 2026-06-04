@@ -1117,6 +1117,10 @@ function renderConsolidation() {
       var cleanRecs = lpR - rmR; if (cleanRecs < 0) cleanRecs = 0;
       var blended = cleanRecs > 0 ? totalCost / cleanRecs : 0;
       var campCount = Object.keys(g.byCamp).length;
+      var campList = [];
+      var campKeys = Object.keys(g.byCamp);
+      for (var ci = 0; ci < campKeys.length; ci++) campList.push({ name: campKeys[ci], recs: g.byCamp[campKeys[ci]] });
+      campList.sort(function(a,b) { return b.recs - a.recs; });
 
       var label;
       if (S.period === 'daily') label = dateLabel(k);
@@ -1124,14 +1128,6 @@ function renderConsolidation() {
       else if (S.period === 'quarterly') label = k + ' 2026';
       else if (S.period === 'yearly') label = k;
       else label = monthLabel(k);
-
-      // Build campaign detail list sorted by records desc
-      var campList = [];
-      var campKeys = Object.keys(g.byCamp);
-      for (var ci = 0; ci < campKeys.length; ci++) {
-        campList.push({ name: campKeys[ci], recs: g.byCamp[campKeys[ci]] });
-      }
-      campList.sort(function(a,b) { return b.recs - a.recs; });
 
       rowData.push({ label: label, lpR: lpR, lpC: lpC, vR: vR, vC: vC, rmR: rmR, rmC: rmC, totalCost: totalCost, cleanRecs: cleanRecs, blended: blended, campCount: campCount, campList: campList });
     }
@@ -1181,14 +1177,9 @@ function renderConsolidation() {
         }
       } else { vsTarget = d; }
       html += '<td class="sum-cell" style="text-align:center">' + vsTarget + '</td>';
-      html += '<td style="cursor:pointer;color:#0f3d2e;text-decoration:underline" onclick="var el=document.getElementById(\'camp-detail-'+i+'\');el.style.display=el.style.display===\'none\'?\'table-row\':\'none\'">' + r.campCount + '</td></tr>';
-      // Expandable campaign detail row
-      html += '<tr id="camp-detail-' + i + '" style="display:none"><td colspan="12" style="padding:6px 12px;background:#f4f8f5;border-top:none">';
-      html += '<div style="display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11px">';
-      for (var ci = 0; ci < r.campList.length; ci++) {
-        var c = r.campList[ci];
-        html += '<span style="white-space:nowrap"><strong>' + c.name.replace(/'/g, '&#39;') + '</strong> <span class="muted">(' + c.recs.toLocaleString() + ' recs)</span></span>';
-      }
+      html += '<td style="cursor:pointer;color:#0f3d2e;text-decoration:underline" onclick="var el=document.getElementById(\'camp-detail-'+i+'\');if(el)el.style.display=el.style.display===\'none\'?\'table-row\':\'none\'">' + r.campCount + '</td></tr>';
+      html += '<tr id="camp-detail-' + i + '" style="display:none"><td colspan="12" style="padding:6px 12px;background:#f4f8f5;border-top:none"><div style="display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11px">';
+      for (var ci = 0; ci < r.campList.length; ci++) { var cc = r.campList[ci]; html += '<span style="white-space:nowrap"><strong>' + cc.name.replace(/'/g,"&#39;") + '</strong> <span class="muted">(' + cc.recs.toLocaleString() + ' recs)</span></span>'; }
       html += '</div></td></tr>';
     }
     html += '</tbody></table>';
@@ -1392,21 +1383,12 @@ function renderCampaignView() {
   var totalV = platTotalRecs['Versium'] || 0;
   var totalRM = platTotalRecs['Readymode'] || 0;
   var combinedCost = lpCostTotal + vCostTotal + rmCostTotal;
-  $('camp-count').innerHTML = '<span style="cursor:pointer;color:#0f3d2e;text-decoration:underline" onclick="var el=document.getElementById(\'cr-camp-expand\');el.style.display=el.style.display===\'none\'?\'block\':\'none\'">' + campNames.length + ' campaigns</span> | LP: ' + fmtK(totalLP) + ' recs | Versium: ' + fmtK(totalV) + ' recs | RM: ' + fmtK(totalRM) + ' recs | Combined: ' + fmt(combinedCost);
-  // Expandable campaign list for Campaign Review
-  try {
-    var oldCrExpand = document.getElementById('cr-camp-expand');
-    if (oldCrExpand) oldCrExpand.remove();
-    var crExpandHtml = '<div id="cr-camp-expand" style="display:none;background:#f4f8f5;border-radius:6px;padding:8px 14px;margin-top:6px;margin-bottom:8px;border:1px solid #e0e0e0"><div style="display:flex;flex-wrap:wrap;gap:3px 14px;font-size:11px">';
-    for (var ci = 0; ci < campNames.length; ci++) {
-      var crCampRecs = campPlatRecs[campNames[ci]] || {};
-      var crClean = (crCampRecs['Land Portal'] || 0) - (crCampRecs['Readymode'] || 0);
-      if (crClean < 0) crClean = 0;
-      crExpandHtml += '<span style="white-space:nowrap"><strong>' + campNames[ci].replace(/'/g, '&#39;') + '</strong> <span class="muted">(' + crClean.toLocaleString() + ' clean)</span></span>';
-    }
-    crExpandHtml += '</div></div>';
-    $('camp-count').insertAdjacentHTML('afterend', crExpandHtml);
-  } catch(e) { console.error('CR expand error:', e); }
+  $('camp-count').innerHTML = '<span style="cursor:pointer;color:#0f3d2e;text-decoration:underline" onclick="var el=document.getElementById(\'cr-camp-expand\');if(el)el.style.display=el.style.display===\'none\'?\'block\':\'none\'">' + campNames.length + ' campaigns</span> | LP: ' + fmtK(totalLP) + ' recs | Versium: ' + fmtK(totalV) + ' recs | RM: ' + fmtK(totalRM) + ' recs | Combined: ' + fmt(combinedCost);
+  var oldCr = document.getElementById('cr-camp-expand'); if (oldCr) oldCr.remove();
+  var crHtml = '<div id="cr-camp-expand" style="display:none;background:#f4f8f5;border-radius:6px;padding:8px 14px;margin-top:6px;margin-bottom:8px;border:1px solid #e0e0e0"><div style="display:flex;flex-wrap:wrap;gap:3px 14px;font-size:11px">';
+  for (var ci = 0; ci < campNames.length; ci++) { var cr = campPlatRecs[campNames[ci]]||{}; var cln = (cr['Land Portal']||0)-(cr['Readymode']||0); if(cln<0)cln=0; crHtml += '<span style="white-space:nowrap"><strong>' + campNames[ci].replace(/'/g,"&#39;") + '</strong> <span class="muted">(' + cln.toLocaleString() + ' clean)</span></span>'; }
+  crHtml += '</div></div>';
+  $('camp-count').insertAdjacentHTML('afterend', crHtml);
 
   renderCPRChart(campPlatRecs, platTotalRecs, lpCostTotal, vCostTotal, rmCostTotal);
   renderEffChart(platTotalRecs, lpCostTotal, vCostTotal, rmCostTotal, combinedCost, totalLP, totalRM);
@@ -1502,9 +1484,6 @@ function setQ(q) {
 }
 
 function renderOverview() {
-  // Clean up old expand div
-  var oldExpand = document.getElementById('overview-camp-expand');
-  if (oldExpand) oldExpand.remove();
   var months = qMonths(S.quarter);
 
   // Quarter costs
@@ -1531,18 +1510,10 @@ function renderOverview() {
     campSet[de.camp] = true;
   }
   var campCount = Object.keys(campSet).length;
-  // Build sorted campaign list for Overview expandable
-  var overviewCampList = [];
-  var campRecs = {};
-  for (var i = 0; i < qDaily.length; i++) {
-    var de = qDaily[i];
-    var deClean = de.rm || 0;
-    campRecs[de.camp] = (campRecs[de.camp] || 0) + deClean;
-  }
-  var crKeys = Object.keys(campRecs);
-  for (var i = 0; i < crKeys.length; i++) {
-    overviewCampList.push({ name: crKeys[i], recs: campRecs[crKeys[i]] });
-  }
+  var overviewCampList = [], campRecs = {};
+  for (var i = 0; i < qDaily.length; i++) { campRecs[qDaily[i].camp] = (campRecs[qDaily[i].camp] || 0) + (qDaily[i].rm || 0); }
+  var crk = Object.keys(campRecs);
+  for (var i = 0; i < crk.length; i++) overviewCampList.push({ name: crk[i], recs: campRecs[crk[i]] });
   overviewCampList.sort(function(a,b) { return b.recs - a.recs; });
 
   var lpR = platRecs['Land Portal'] || 0;
@@ -1564,13 +1535,74 @@ function renderOverview() {
     '<div class="kpi-card"><div class="kpi-label">Versium</div><div class="kpi-value">' + (vR > 0 ? fmtK(vR) + ' recs' : '—') + '</div><div class="kpi-sub">' + (vCpr > 0 ? '$' + vCpr.toFixed(4) + '/rec | ' + fmt(vS) : 'No cost data') + '</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">Readymode (Scrubbed off)</div><div class="kpi-value">' + (rmR > 0 ? fmtK(rmR) + ' recs' : '—') + '</div><div class="kpi-sub">' + (rmCpr > 0 ? '$' + rmCpr.toFixed(4) + '/rec | ' + fmt(rmS) : 'No cost data') + '</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">Blended $/Record <span style="font-size:9px;color:#888">(target: $' + BLENDED_TARGET.toFixed(2) + ')</span></div><div class="kpi-value ' + blendedClass(blendedCpr) + '">' + (blendedCpr > 0 ? blendedDot(blendedCpr) + '$' + blendedCpr.toFixed(4) : '—') + '</div><div class="kpi-sub">' + (cleanRecs > 0 ? fmtK(cleanRecs) + ' clean records' : 'No data') + '</div></div>' +
-    '<div class="kpi-card" style="cursor:pointer" onclick="var el=document.getElementById(\'overview-camp-expand\');el.style.display=el.style.display===\'none\'?\'block\':\'none\'"><div class="kpi-label">Campaigns <span style="font-size:9px;color:#888">(click to expand)</span></div><div class="kpi-value">' + (campCount || DATA_CAMPAIGNS.length) + '</div><div class="kpi-sub">' + (campCount > 0 ? 'With recorded data' : 'From Command Center') + '</div></div>';
-  // Expandable campaign list below KPIs
-  try {
-    var campExpandHtml = '<div id="overview-camp-expand" style="display:none;background:#f4f8f5;border-radius:6px;padding:10px 14px;margin-bottom:12px;border:1px solid #e0e0e0"><div style="font-size:11px;font-weight:600;color:#0f3d2e;margin-bottom:6px">Campaigns in ' + S.quarter + ' (' + overviewCampList.length + ')</div><div style="display:flex;flex-wrap:wrap;gap:3px 14px;font-size:11px">';
-    for (var ci = 0; ci < overviewCampList.length; ci++) {
-      var oc = overviewCampList[ci];
-      campExpandHtml += '<span style="white-space:nowrap"><strong>' + oc.name.replace(/'/g, '&#39;') + '</strong> <span class="muted">(' + oc.recs.toLocaleString() + ' clean)</span></span>';
+    '<div class="kpi-card" style="cursor:pointer" onclick="var el=document.getElementById(\'overview-camp-expand\');if(el)el.style.display=el.style.display===\'none\'?\'block\':\'none\'"><div class="kpi-label">Campaigns <span style=\"font-size:9px;color:#888\">(click to expand)</span></div><div class="kpi-value">' + (campCount || DATA_CAMPAIGNS.length) + '</div><div class="kpi-sub">' + (campCount > 0 ? 'With recorded data' : 'From Command Center') + '</div></div>';
+  var oldOvExp = document.getElementById('overview-camp-expand'); if (oldOvExp) oldOvExp.remove();
+  var ovHtml = '<div id="overview-camp-expand" style="display:none;background:#f4f8f5;border-radius:6px;padding:10px 14px;margin-bottom:12px;border:1px solid #e0e0e0"><div style="font-size:11px;font-weight:600;color:#0f3d2e;margin-bottom:6px">Campaigns in ' + S.quarter + ' (' + overviewCampList.length + ')</div><div style="display:flex;flex-wrap:wrap;gap:3px 14px;font-size:11px">';
+  for (var ci = 0; ci < overviewCampList.length; ci++) { ovHtml += '<span style="white-space:nowrap"><strong>' + overviewCampList[ci].name.replace(/'/g,"&#39;") + '</strong> <span class="muted">(' + overviewCampList[ci].recs.toLocaleString() + ' clean)</span></span>'; }
+  ovHtml += '</div></div>';
+  $('kpis').insertAdjacentHTML('afterend', ovHtml);
+
+  // Spend chart
+  destroyChart('spend');
+  var ctx1 = $('spendChart');
+  if (ctx1) {
+    var allMonths = {};
+    for (var i = 0; i < S.costs.length; i++) { allMonths[S.costs[i].month] = true; }
+    var mKeys = Object.keys(allMonths).sort();
+    var mSpend = {};
+    for (var i = 0; i < S.costs.length; i++) { mSpend[S.costs[i].month] = (mSpend[S.costs[i].month]||0) + S.costs[i].amt; }
+
+    CK.spend = new Chart(ctx1, {
+      type: 'bar', data: { labels: mKeys.map(monthLabel), datasets: [{ data: mKeys.map(function(m) { return mSpend[m]||0; }), backgroundColor: '#0f3d2e88', borderColor: '#0f3d2e', borderWidth: 1, borderRadius: 3 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: function(v) { return '$'+v.toLocaleString(); } } } } }
+    });
+  }
+
+  // Cost share pie
+  destroyChart('share');
+  var ctx2 = $('shareChart');
+  if (ctx2) {
+    var labels2 = Object.keys(platSpend);
+    if (labels2.length > 0) {
+      CK.share = new Chart(ctx2, {
+        type: 'doughnut', data: { labels: labels2, datasets: [{ data: labels2.map(function(l) { return platSpend[l]; }), backgroundColor: ['#0f3d2e','#e8913a','#1a5c44','#d4a843'], borderWidth: 2, borderColor: '#fff' }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } }, tooltip: { callbacks: { label: function(ctx) { return ctx.label+': '+fmt(ctx.parsed); } } } } }
+      });
     }
-    campExpandHtml += '</div></div>';
-    $('kpis').in
+  }
+}
+
+// ============================================================
+// TAB SWITCHING
+// ============================================================
+function switchTab(name, btn) {
+  var tabs = document.querySelectorAll('.tab');
+  for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+  var contents = document.querySelectorAll('.tab-content');
+  for (var i = 0; i < contents.length; i++) contents[i].classList.remove('active');
+  $('tab-'+name).classList.add('active');
+  btn.classList.add('active');
+  setTimeout(function() {
+    if (name === 'consolidation') renderConsolidation();
+    if (name === 'campaigns') renderCampaignView();
+    if (name === 'costs') renderPlatformChart();
+    if (name === 'overview') renderOverview();
+  }, 50);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+load(function() {
+  var el = document.getElementById('load-status');
+  if (el && S.daily.length > 0) {
+    el.textContent = 'Connected — ' + S.daily.length + ' entries, ' + S.costs.length + ' cost records loaded';
+    el.style.color = '#2e7d32';
+  } else if (el && S.daily.length === 0 && S.costs.length === 0) {
+    el.textContent = 'Connected — no data found. Add entries above.';
+  }
+  renderAll();
+});
+</script>
+</body>
+</html>
