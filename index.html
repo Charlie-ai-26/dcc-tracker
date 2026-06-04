@@ -1187,7 +1187,7 @@ function renderConsolidation() {
       html += '<div style="display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11px">';
       for (var ci = 0; ci < r.campList.length; ci++) {
         var c = r.campList[ci];
-        html += '<span style="white-space:nowrap"><strong>' + c.name + '</strong> <span class="muted">(' + c.recs.toLocaleString() + ' recs)</span></span>';
+        html += '<span style="white-space:nowrap"><strong>' + c.name.replace(/'/g, '&#39;') + '</strong> <span class="muted">(' + c.recs.toLocaleString() + ' recs)</span></span>';
       }
       html += '</div></td></tr>';
     }
@@ -1394,17 +1394,19 @@ function renderCampaignView() {
   var combinedCost = lpCostTotal + vCostTotal + rmCostTotal;
   $('camp-count').innerHTML = '<span style="cursor:pointer;color:#0f3d2e;text-decoration:underline" onclick="var el=document.getElementById(\'cr-camp-expand\');el.style.display=el.style.display===\'none\'?\'block\':\'none\'">' + campNames.length + ' campaigns</span> | LP: ' + fmtK(totalLP) + ' recs | Versium: ' + fmtK(totalV) + ' recs | RM: ' + fmtK(totalRM) + ' recs | Combined: ' + fmt(combinedCost);
   // Expandable campaign list for Campaign Review
-  var oldCrExpand = document.getElementById('cr-camp-expand');
-  if (oldCrExpand) oldCrExpand.remove();
-  var crExpandHtml = '<div id="cr-camp-expand" style="display:none;background:#f4f8f5;border-radius:6px;padding:8px 14px;margin-top:6px;margin-bottom:8px;border:1px solid #e0e0e0"><div style="display:flex;flex-wrap:wrap;gap:3px 14px;font-size:11px">';
-  for (var ci = 0; ci < campNames.length; ci++) {
-    var crCampRecs = campPlatRecs[campNames[ci]] || {};
-    var crClean = (crCampRecs['Land Portal'] || 0) - (crCampRecs['Readymode'] || 0);
-    if (crClean < 0) crClean = 0;
-    crExpandHtml += '<span style="white-space:nowrap"><strong>' + campNames[ci] + '</strong> <span class="muted">(' + crClean.toLocaleString() + ' clean)</span></span>';
-  }
-  crExpandHtml += '</div></div>';
-  $('camp-count').insertAdjacentHTML('afterend', crExpandHtml);
+  try {
+    var oldCrExpand = document.getElementById('cr-camp-expand');
+    if (oldCrExpand) oldCrExpand.remove();
+    var crExpandHtml = '<div id="cr-camp-expand" style="display:none;background:#f4f8f5;border-radius:6px;padding:8px 14px;margin-top:6px;margin-bottom:8px;border:1px solid #e0e0e0"><div style="display:flex;flex-wrap:wrap;gap:3px 14px;font-size:11px">';
+    for (var ci = 0; ci < campNames.length; ci++) {
+      var crCampRecs = campPlatRecs[campNames[ci]] || {};
+      var crClean = (crCampRecs['Land Portal'] || 0) - (crCampRecs['Readymode'] || 0);
+      if (crClean < 0) crClean = 0;
+      crExpandHtml += '<span style="white-space:nowrap"><strong>' + campNames[ci].replace(/'/g, '&#39;') + '</strong> <span class="muted">(' + crClean.toLocaleString() + ' clean)</span></span>';
+    }
+    crExpandHtml += '</div></div>';
+    $('camp-count').insertAdjacentHTML('afterend', crExpandHtml);
+  } catch(e) { console.error('CR expand error:', e); }
 
   renderCPRChart(campPlatRecs, platTotalRecs, lpCostTotal, vCostTotal, rmCostTotal);
   renderEffChart(platTotalRecs, lpCostTotal, vCostTotal, rmCostTotal, combinedCost, totalLP, totalRM);
@@ -1564,17 +1566,11 @@ function renderOverview() {
     '<div class="kpi-card"><div class="kpi-label">Blended $/Record <span style="font-size:9px;color:#888">(target: $' + BLENDED_TARGET.toFixed(2) + ')</span></div><div class="kpi-value ' + blendedClass(blendedCpr) + '">' + (blendedCpr > 0 ? blendedDot(blendedCpr) + '$' + blendedCpr.toFixed(4) : '—') + '</div><div class="kpi-sub">' + (cleanRecs > 0 ? fmtK(cleanRecs) + ' clean records' : 'No data') + '</div></div>' +
     '<div class="kpi-card" style="cursor:pointer" onclick="var el=document.getElementById(\'overview-camp-expand\');el.style.display=el.style.display===\'none\'?\'block\':\'none\'"><div class="kpi-label">Campaigns <span style="font-size:9px;color:#888">(click to expand)</span></div><div class="kpi-value">' + (campCount || DATA_CAMPAIGNS.length) + '</div><div class="kpi-sub">' + (campCount > 0 ? 'With recorded data' : 'From Command Center') + '</div></div>';
   // Expandable campaign list below KPIs
-  var campExpandHtml = '<div id="overview-camp-expand" style="display:none;background:#f4f8f5;border-radius:6px;padding:10px 14px;margin-bottom:12px;border:1px solid #e0e0e0"><div style="font-size:11px;font-weight:600;color:#0f3d2e;margin-bottom:6px">Campaigns in ' + S.quarter + ' (' + overviewCampList.length + ')</div><div style="display:flex;flex-wrap:wrap;gap:3px 14px;font-size:11px">';
-  for (var ci = 0; ci < overviewCampList.length; ci++) {
-    var oc = overviewCampList[ci];
-    campExpandHtml += '<span style="white-space:nowrap"><strong>' + oc.name + '</strong> <span class="muted">(' + oc.recs.toLocaleString() + ' clean)</span></span>';
-  }
-  campExpandHtml += '</div></div>';
-  $('kpis').insertAdjacentHTML('afterend', campExpandHtml);
-
-  // Spend chart
-  destroyChart('spend');
-  var ctx1 = $('spendChart');
-  if (ctx1) {
-    var allMonths = {};
-    for (var i = 0;
+  try {
+    var campExpandHtml = '<div id="overview-camp-expand" style="display:none;background:#f4f8f5;border-radius:6px;padding:10px 14px;margin-bottom:12px;border:1px solid #e0e0e0"><div style="font-size:11px;font-weight:600;color:#0f3d2e;margin-bottom:6px">Campaigns in ' + S.quarter + ' (' + overviewCampList.length + ')</div><div style="display:flex;flex-wrap:wrap;gap:3px 14px;font-size:11px">';
+    for (var ci = 0; ci < overviewCampList.length; ci++) {
+      var oc = overviewCampList[ci];
+      campExpandHtml += '<span style="white-space:nowrap"><strong>' + oc.name.replace(/'/g, '&#39;') + '</strong> <span class="muted">(' + oc.recs.toLocaleString() + ' clean)</span></span>';
+    }
+    campExpandHtml += '</div></div>';
+    $('kpis').in
