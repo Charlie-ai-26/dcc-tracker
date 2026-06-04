@@ -1125,7 +1125,15 @@ function renderConsolidation() {
       else if (S.period === 'yearly') label = k;
       else label = monthLabel(k);
 
-      rowData.push({ label: label, lpR: lpR, lpC: lpC, vR: vR, vC: vC, rmR: rmR, rmC: rmC, totalCost: totalCost, cleanRecs: cleanRecs, blended: blended, campCount: campCount });
+      // Build campaign detail list sorted by records desc
+      var campList = [];
+      var campKeys = Object.keys(g.byCamp);
+      for (var ci = 0; ci < campKeys.length; ci++) {
+        campList.push({ name: campKeys[ci], recs: g.byCamp[campKeys[ci]] });
+      }
+      campList.sort(function(a,b) { return b.recs - a.recs; });
+
+      rowData.push({ label: label, lpR: lpR, lpC: lpC, vR: vR, vC: vC, rmR: rmR, rmC: rmC, totalCost: totalCost, cleanRecs: cleanRecs, blended: blended, campCount: campCount, campList: campList });
     }
 
     function wowBadge(curr, prev) {
@@ -1173,7 +1181,15 @@ function renderConsolidation() {
         }
       } else { vsTarget = d; }
       html += '<td class="sum-cell" style="text-align:center">' + vsTarget + '</td>';
-      html += '<td>' + r.campCount + '</td></tr>';
+      html += '<td style="cursor:pointer;color:#0f3d2e;text-decoration:underline" onclick="var el=document.getElementById(\'camp-detail-'+i+'\');el.style.display=el.style.display===\'none\'?\'table-row\':\'none\'">' + r.campCount + '</td></tr>';
+      // Expandable campaign detail row
+      html += '<tr id="camp-detail-' + i + '" style="display:none"><td colspan="12" style="padding:6px 12px;background:#f4f8f5;border-top:none">';
+      html += '<div style="display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11px">';
+      for (var ci = 0; ci < r.campList.length; ci++) {
+        var c = r.campList[ci];
+        html += '<span style="white-space:nowrap"><strong>' + c.name + '</strong> <span class="muted">(' + c.recs.toLocaleString() + ' recs)</span></span>';
+      }
+      html += '</div></td></tr>';
     }
     html += '</tbody></table>';
     container.innerHTML = html;
