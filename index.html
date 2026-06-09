@@ -186,6 +186,16 @@ h3 { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; }
 .bm-dot.warn { background: #e65100; }
 .bm-dot.bad { background: #c62828; }
 
+/* Edit mode */
+.btn-edit { background:#e3f2fd; color:#1565c0; border:1px solid #90caf9; padding:2px 7px; font-size:10px; cursor:pointer; border-radius:4px; margin-right:2px; }
+.btn-edit:hover { background:#bbdefb; }
+.btn-save { background:#e8f5e9; color:#2e7d32; border:1px solid #a5d6a7; padding:2px 7px; font-size:10px; cursor:pointer; border-radius:4px; margin-right:2px; }
+.btn-save:hover { background:#c8e6c9; }
+.btn-cancel { background:#f5f5f5; color:#666; border:1px solid #ddd; padding:2px 7px; font-size:10px; cursor:pointer; border-radius:4px; }
+.btn-cancel:hover { background:#eee; }
+.edit-input { width:80px; padding:3px 5px; border:1px solid #0f3d2e; border-radius:4px; font-size:11px; text-align:right; }
+.edit-input:focus { outline:none; box-shadow:0 0 0 2px rgba(15,61,46,0.2); }
+
 /* Empty state */
 .empty { text-align: center; padding: 30px; color: #aaa; font-size: 12px; }
 </style>
@@ -650,7 +660,7 @@ function toggleAdmin() {
     $('admin-lock').innerHTML = '&#x1f512;';
     $('admin-lock').classList.remove('unlocked');
     $('admin-lock').title = 'Toggle admin mode';
-    renderDailyTable();
+    renderAll();
     return;
   }
   var pw = prompt('Enter admin password:');
@@ -659,7 +669,7 @@ function toggleAdmin() {
     $('admin-lock').innerHTML = '&#x1f513;';
     $('admin-lock').classList.add('unlocked');
     $('admin-lock').title = 'Admin mode ON — click to lock';
-    renderDailyTable();
+    renderAll();
   } else if (pw !== null) {
     alert('Incorrect password.');
   }
@@ -890,9 +900,46 @@ function addDaily() {
   });
 }
 function rmDaily(id) {
+  if (!confirm('Delete this entry?')) return;
   sb.from('dcc_daily_entries').delete().eq('id', id).then(function(res) {
     if (res.error) return alert('Error deleting: ' + res.error.message);
     S.daily = S.daily.filter(function(e) { return e.id !== id; });
+    renderAll();
+  });
+}
+
+
+// --- DAILY ENTRY EDITING ---
+function editDaily(id) {
+  var entry = null;
+  for (var i = 0; i < S.daily.length; i++) { if (S.daily[i].id === id) { entry = S.daily[i]; break; } }
+  if (!entry) return;
+  var row = document.getElementById('daily-row-' + id);
+  if (!row) return;
+  // Cells: 0=date 1=camp 2=bm 3=LP 4=LPcost 5=LP$/r 6=V 7=Vcost 8=V$/r 9=RMscrub 10=RMcost 11=RM$/r 12=clean 13=tot$ 14=blended 15=by 16=actions
+  row.cells[3].innerHTML = '<input type="number" class="edit-input" id="de-lp-' + id + '" value="' + (entry.lp||0) + '">';
+  row.cells[6].innerHTML = '<input type="number" class="edit-input" id="de-v-' + id + '" value="' + (entry.v||0) + '">';
+  row.cells[12].innerHTML = '<input type="number" class="edit-input" id="de-clean-' + id + '" value="' + (entry.rm||0) + '">';
+  row.cells[16].innerHTML = '<button class="btn-save" onclick="saveDailyEdit(' + id + ')">Save</button> <button class="btn-cancel" onclick="renderDailyTable()">Cancel</button>';
+  var inputs = [document.getElementById('de-lp-'+id), document.getElementById('de-v-'+id), document.getElementById('de-clean-'+id)];
+  for (var ii = 0; ii < inputs.length; ii++) {
+    if (inputs[ii]) inputs[ii].addEventListener('keydown', function(ev) { if (ev.key==='Enter') saveDailyEdit(id); if (ev.key==='Escape') renderDailyTable(); });
+  }
+  if (inputs[0]) inputs[0].focus();
+}
+function saveDailyEdit(id) {
+  var lpEl = document.getElementById('de-lp-' + id);
+  var vEl = document.getElementById('de-v-' + id);
+  var clEl = document.getElementById('de-clean-' + id);
+  if (!lpEl || !vEl || !clEl) return;
+  var lp = parseInt(lpEl.value) || 0;
+  var v = parseInt(vEl.value) || 0;
+  var cl = parseInt(clEl.value) || 0;
+  sb.from('dcc_daily_entries').update({ lp_records: lp, v_records: v, rm_records: cl }).eq('id', id).then(function(res) {
+    if (res.error) return alert('Error: ' + res.error.message);
+    for (var i = 0; i < S.daily.length; i++) {
+      if (S.daily[i].id === id) { S.daily[i].lp = lp; S.daily[i].v = v; S.daily[i].rm = cl; break; }
+    }
     renderAll();
   });
 }
@@ -948,7 +995,7 @@ function renderDailyTable() {
     var blended = cleanRecs > 0 ? totalCost / cleanRecs : 0;
 
     var d = '<span class="muted">—</span>';
-    html += '<tr>';
+    html += '<tr id="daily-row-' + e.id + '">';
     html += '<td style="white-space:nowrap">' + dateLabel(e.date) + '</td>';
     html += '<td>' + e.camp + '</td>';
     html += '<td id="bm-cell-' + e.id + '"><span class="badge b-green">' + monthLabel(mk) + '</span>' + (isAdmin ? '<button class="bm-edit-btn" onclick="editBillingMonth(' + e.id + ')" title="Edit billing month">&#9998;</button>' : '') + '</td>';
@@ -965,7 +1012,7 @@ function renderDailyTable() {
     html += '<td class="sum-cell" style="text-align:right">' + (totalCost > 0 ? fmt(totalCost) : d) + '</td>';
     html += '<td class="sum-cell" style="text-align:right">' + fmtBlended(blended) + '</td>';
     html += '<td>' + (e.by || '—') + '</td>';
-    html += '<td><button class="btn-x" onclick="rmDaily(' + e.id + ')">x</button></td>';
+    html += '<td style="white-space:nowrap">' + (isAdmin ? '<button class="btn-edit" onclick="editDaily(' + e.id + ')" title="Edit">&#9998;</button> <button class="btn-x" onclick="rmDaily(' + e.id + ')" title="Delete">x</button>' : '') + '</td>';
     html += '</tr>';
   }
   if (sorted.length > 50) html += '<tr><td colspan="17" class="muted" style="text-align:center">Showing 50 of ' + sorted.length + ' entries</td></tr>';
@@ -1020,9 +1067,35 @@ function addCost() {
   }
 }
 function rmCost(id) {
+  if (!confirm('Delete this cost entry?')) return;
   sb.from('dcc_platform_costs').delete().eq('id', id).then(function(res) {
     if (res.error) return alert('Error deleting: ' + res.error.message);
     S.costs = S.costs.filter(function(c) { return c.id !== id; });
+    renderAll();
+  });
+}
+
+
+// --- COST EDITING ---
+function editCost(id) {
+  var entry = null;
+  for (var i = 0; i < S.costs.length; i++) { if (S.costs[i].id === id) { entry = S.costs[i]; break; } }
+  if (!entry) return;
+  var row = document.getElementById('cost-row-' + id);
+  if (!row) return;
+  row.cells[2].innerHTML = '<input type="number" step="0.01" class="edit-input" id="ce-amt-' + id + '" value="' + entry.amt.toFixed(2) + '">';
+  row.cells[3].innerHTML = '<button class="btn-save" onclick="saveCostEdit(' + id + ')">Save</button> <button class="btn-cancel" onclick="renderCostTable()">Cancel</button>';
+  var inp = document.getElementById('ce-amt-' + id);
+  if (inp) { inp.focus(); inp.select(); inp.addEventListener('keydown', function(ev) { if (ev.key==='Enter') saveCostEdit(id); if (ev.key==='Escape') renderCostTable(); }); }
+}
+function saveCostEdit(id) {
+  var inp = document.getElementById('ce-amt-' + id);
+  if (!inp) return;
+  var newAmt = parseFloat(inp.value) || 0;
+  if (newAmt <= 0) return alert('Enter a valid amount.');
+  sb.from('dcc_platform_costs').update({ amount: newAmt }).eq('id', id).then(function(res) {
+    if (res.error) return alert('Error: ' + res.error.message);
+    for (var i = 0; i < S.costs.length; i++) { if (S.costs[i].id === id) { S.costs[i].amt = newAmt; break; } }
     renderAll();
   });
 }
@@ -1034,7 +1107,7 @@ function renderCostTable() {
   for (var i = 0; i < sorted.length; i++) {
     var c = sorted[i];
     var pColor = c.plat === 'Versium' ? 'b-teal' : c.plat === 'Readymode' ? 'b-orange' : 'b-blue';
-    html += '<tr><td>' + monthLabel(c.month) + '</td><td><span class="badge ' + pColor + '">' + c.plat + '</span></td><td><strong>' + fmt(c.amt) + '</strong></td><td><button class="btn-x" onclick="rmCost(' + c.id + ')">x</button></td></tr>';
+    html += '<tr id="cost-row-' + c.id + '"><td>' + monthLabel(c.month) + '</td><td><span class="badge ' + pColor + '">' + c.plat + '</span></td><td><strong>' + fmt(c.amt) + '</strong></td><td style="white-space:nowrap">' + (isAdmin ? '<button class="btn-edit" onclick="editCost(' + c.id + ')" title="Edit">&#9998;</button> <button class="btn-x" onclick="rmCost(' + c.id + ')" title="Delete">x</button>' : '') + '</td></tr>';
   }
   $('cost-body').innerHTML = html;
 }
