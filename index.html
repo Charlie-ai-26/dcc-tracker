@@ -73,6 +73,15 @@ h3 { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; }
 #daily-tbl td.v-cell { background: #f4faf9; }
 #daily-tbl td.rm-cell { background: #fffbf5; }
 #daily-tbl td.sum-cell { background: #faf5fc; font-weight: 700; }
+
+/* Right-align numeric sub-headers to match data */
+#daily-tbl thead tr:nth-child(2) th,
+#camp-tbl thead tr:nth-child(2) th { text-align: right; padding: 6px 8px; }
+/* Tighter padding on numeric data cells */
+#daily-tbl td.lp-cell, #daily-tbl td.v-cell, #daily-tbl td.rm-cell, #daily-tbl td.sum-cell,
+#camp-tbl td.lp-cell, #camp-tbl td.v-cell, #camp-tbl td.rm-cell, #camp-tbl td.sum-cell { padding: 7px 8px; }
+/* Consistent column widths for numeric columns */
+.col-lp, .col-v, .col-rm, .col-sum { min-width: 65px; }
 #daily-tbl tbody tr:hover td.lp-cell { background: #eaf5eb; }
 #daily-tbl tbody tr:hover td.v-cell { background: #e6f5f2; }
 #daily-tbl tbody tr:hover td.rm-cell { background: #fff5e6; }
@@ -272,10 +281,10 @@ h3 { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; }
             <th rowspan="2">By</th><th rowspan="2"></th>
           </tr>
           <tr>
-            <th class="col-lp" style="border-bottom-width:1px">Recs</th><th class="col-lp" style="border-bottom-width:1px">Cost</th><th class="col-lp" style="border-bottom-width:1px">$/Rec</th>
-            <th class="col-v" style="border-bottom-width:1px">Recs</th><th class="col-v" style="border-bottom-width:1px">Cost</th><th class="col-v" style="border-bottom-width:1px">$/Rec</th>
-            <th class="col-rm" style="border-bottom-width:1px">Recs</th><th class="col-rm" style="border-bottom-width:1px">Cost</th><th class="col-rm" style="border-bottom-width:1px">$/Rec</th>
-            <th class="col-sum" style="border-bottom-width:1px">Clean</th><th class="col-sum" style="border-bottom-width:1px">Total $</th><th class="col-sum" style="border-bottom-width:1px">Blended</th>
+            <th class="col-lp" style="border-bottom-width:1px;text-align:right">Recs</th><th class="col-lp" style="border-bottom-width:1px;text-align:right">Cost</th><th class="col-lp" style="border-bottom-width:1px;text-align:right">$/Rec</th>
+            <th class="col-v" style="border-bottom-width:1px;text-align:right">Recs</th><th class="col-v" style="border-bottom-width:1px;text-align:right">Cost</th><th class="col-v" style="border-bottom-width:1px;text-align:right">$/Rec</th>
+            <th class="col-rm" style="border-bottom-width:1px;text-align:right">Recs</th><th class="col-rm" style="border-bottom-width:1px;text-align:right">Cost</th><th class="col-rm" style="border-bottom-width:1px;text-align:right">$/Rec</th>
+            <th class="col-sum" style="border-bottom-width:1px;text-align:right">Clean</th><th class="col-sum" style="border-bottom-width:1px;text-align:right">Total $</th><th class="col-sum" style="border-bottom-width:1px;text-align:right">Blended</th>
           </tr>
         </thead>
         <tbody id="daily-body"></tbody>
@@ -1430,10 +1439,10 @@ function renderCampaignView() {
     thtml += '<th colspan="3" class="col-grp col-rm">Readymode (Scrubbed off)</th>';
     thtml += '<th colspan="3" class="col-grp col-sum">Summary</th>';
     thtml += '</tr><tr>';
-    thtml += '<th class="col-lp" style="border-bottom-width:1px">Recs</th><th class="col-lp" style="border-bottom-width:1px">Cost</th><th class="col-lp" style="border-bottom-width:1px">$/Rec</th>';
-    thtml += '<th class="col-v" style="border-bottom-width:1px">Recs</th><th class="col-v" style="border-bottom-width:1px">Cost</th><th class="col-v" style="border-bottom-width:1px">$/Rec</th>';
-    thtml += '<th class="col-rm" style="border-bottom-width:1px">Recs</th><th class="col-rm" style="border-bottom-width:1px">Cost</th><th class="col-rm" style="border-bottom-width:1px">$/Rec</th>';
-    thtml += '<th class="col-sum" style="border-bottom-width:1px">Clean</th><th class="col-sum" style="border-bottom-width:1px">Total $</th><th class="col-sum" style="border-bottom-width:1px">Blended</th>';
+    thtml += '<th class="col-lp" style="border-bottom-width:1px;text-align:right">Recs</th><th class="col-lp" style="border-bottom-width:1px;text-align:right">Cost</th><th class="col-lp" style="border-bottom-width:1px;text-align:right">$/Rec</th>';
+    thtml += '<th class="col-v" style="border-bottom-width:1px;text-align:right">Recs</th><th class="col-v" style="border-bottom-width:1px;text-align:right">Cost</th><th class="col-v" style="border-bottom-width:1px;text-align:right">$/Rec</th>';
+    thtml += '<th class="col-rm" style="border-bottom-width:1px;text-align:right">Recs</th><th class="col-rm" style="border-bottom-width:1px;text-align:right">Cost</th><th class="col-rm" style="border-bottom-width:1px;text-align:right">$/Rec</th>';
+    thtml += '<th class="col-sum" style="border-bottom-width:1px;text-align:right">Clean</th><th class="col-sum" style="border-bottom-width:1px;text-align:right">Total $</th><th class="col-sum" style="border-bottom-width:1px;text-align:right">Blended</th>';
     thtml += '</tr></thead><tbody>';
     for (var ri = 0; ri < rows.length; ri++) {
       var r = rows[ri];
