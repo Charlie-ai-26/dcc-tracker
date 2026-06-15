@@ -111,20 +111,20 @@ h3 { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; }
 .mbox p { font-size: 11px; color: #555; margin-bottom: 2px; }
 
 /* Frozen columns */
-#daily-tbl th:nth-child(1), #daily-tbl td:nth-child(1) {
+#daily-tbl thead tr:first-child th:nth-child(1), #daily-tbl td:nth-child(1) {
   position: sticky; left: 0; z-index: 2; min-width: 110px;
 }
 #daily-tbl td:nth-child(1) { background: #fff; }
 #daily-tbl tbody tr:nth-child(even) td:nth-child(1) { background: #fafbfc; }
 
-#daily-tbl th:nth-child(2), #daily-tbl td:nth-child(2) {
+#daily-tbl thead tr:first-child th:nth-child(2), #daily-tbl td:nth-child(2) {
   position: sticky; left: 110px; z-index: 2; min-width: 170px;
   border-right: 2px solid #d0d0d0; box-shadow: 2px 0 4px rgba(0,0,0,0.04);
 }
 #daily-tbl td:nth-child(2) { background: #fff; font-weight: 600; }
 #daily-tbl tbody tr:nth-child(even) td:nth-child(2) { background: #fafbfc; }
 
-#daily-tbl thead th:nth-child(1), #daily-tbl thead th:nth-child(2) {
+#daily-tbl thead tr:first-child th:nth-child(1), #daily-tbl thead tr:first-child th:nth-child(2) {
   background: #f8f9fa; z-index: 4;
 }
 #daily-tbl thead th { position: sticky; top: 0; z-index: 3; }
