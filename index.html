@@ -253,6 +253,7 @@ h3 { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; }
         <div class="fg" style="max-width:110px"><label>LP Records</label><input type="number" id="d-lp" placeholder="0"></div>
         <div class="fg" style="max-width:110px"><label>Versium Records</label><input type="number" id="d-v" placeholder="0"></div>
         <div class="fg" style="max-width:110px"><label>Clean Records</label><input type="number" id="d-rm" placeholder="0"></div>
+        <div class="fg" style="max-width:120px"><label>RM Scrubbed <span style="font-weight:400;text-transform:none">(opt)</span></label><input type="number" id="d-rmscrub" placeholder="Auto"></div>
         <div class="fg" style="max-width:130px"><label>Entered By</label><input type="text" id="d-by" placeholder="Your name"></div>
         <div class="fg" style="max-width:150px"><label>Notes</label><input type="text" id="d-notes" placeholder="Optional"></div>
         <button class="btn btn-p" onclick="addDaily()">Log Entry</button>
@@ -603,7 +604,7 @@ function load(callback) {
       S.daily = [];
       for (var i = 0; i < res.data.length; i++) {
         var r = res.data[i];
-        S.daily.push({ id: r.id, date: r.entry_date, camp: r.campaign, bm: r.billing_month || r.entry_date.substring(0,7), lp: r.lp_records || 0, v: r.v_records || 0, rm: r.rm_records || 0, by: r.entered_by || '', notes: r.notes || '' });
+        S.daily.push({ id: r.id, date: r.entry_date, camp: r.campaign, bm: r.billing_month || r.entry_date.substring(0,7), lp: r.lp_records || 0, v: r.v_records || 0, rm: r.rm_records || 0, rmOv: r.rm_scrubbed_override != null ? r.rm_scrubbed_override : null, by: r.entered_by || '', notes: r.notes || '' });
       }
     }
     check();
@@ -763,7 +764,7 @@ function consolidate(period, fromDate, toDate) {
     k = keyFn(e.date);
     if (!groups[k]) groups[k] = { records: 0, byCamp: {}, byPlat: {}, costByPlat: {} };
     var eLp = e.lp || 0, eV = e.v || 0, eClean = e.rm || 0;
-    var eScrub = Math.max(0, eLp - eClean);
+    var eScrub = getScrub(e);
     var eTotal = eLp + eV + eScrub;
     groups[k].records += eTotal;
     groups[k].byCamp[e.camp] = (groups[k].byCamp[e.camp] || 0) + eTotal;
@@ -900,6 +901,7 @@ function addDaily() {
   var lp = parseInt($('d-lp').value) || 0;
   var v = parseInt($('d-v').value) || 0;
   var clean = parseInt($('d-rm').value) || 0;
+  var rmScrubOv = $('d-rmscrub').value.trim() !== '' ? parseInt($('d-rmscrub').value) : null;
   var by = $('d-by').value.trim();
   var notes = $('d-notes').value;
   if (!date || !camp) return alert('Enter date and campaign.');
@@ -907,13 +909,13 @@ function addDaily() {
   if (!by) return alert('Enter your name in the "Entered By" field.');
 
   sb.from('dcc_daily_entries').insert({
-    entry_date: date, campaign: camp, billing_month: bm, lp_records: lp, v_records: v, rm_records: clean, entered_by: by, notes: notes
+    entry_date: date, campaign: camp, billing_month: bm, lp_records: lp, v_records: v, rm_records: clean, rm_scrubbed_override: rmScrubOv, entered_by: by, notes: notes
   }).select().then(function(res) {
     if (res.error) return alert('Error saving: ' + res.error.message);
     var r = res.data[0];
-    S.daily.unshift({ id: r.id, date: r.entry_date, camp: r.campaign, bm: r.billing_month, lp: r.lp_records, v: r.v_records, rm: r.rm_records, by: r.entered_by, notes: r.notes || '' });
+    S.daily.unshift({ id: r.id, date: r.entry_date, camp: r.campaign, bm: r.billing_month, lp: r.lp_records, v: r.v_records, rm: r.rm_records, rmOv: r.rm_scrubbed_override != null ? r.rm_scrubbed_override : null, by: r.entered_by, notes: r.notes || '' });
     try { localStorage.setItem('landai_dcc_lastby', by); } catch(e){}
-    $('d-lp').value = ''; $('d-v').value = ''; $('d-rm').value = '';
+    $('d-lp').value = ''; $('d-v').value = ''; $('d-rm').value = ''; $('d-rmscrub').value = '';
     $('d-notes').value = '';
     renderAll();
   });
@@ -938,9 +940,10 @@ function editDaily(id) {
   // Cells: 0=date 1=camp 2=bm 3=LP 4=LPcost 5=LP$/r 6=V 7=Vcost 8=V$/r 9=RMscrub 10=RMcost 11=RM$/r 12=clean 13=tot$ 14=blended 15=by 16=actions
   row.cells[3].innerHTML = '<input type="number" class="edit-input" id="de-lp-' + id + '" value="' + (entry.lp||0) + '">';
   row.cells[6].innerHTML = '<input type="number" class="edit-input" id="de-v-' + id + '" value="' + (entry.v||0) + '">';
+  row.cells[9].innerHTML = '<input type="number" class="edit-input" id="de-rmscrub-' + id + '" value="' + (entry.rmOv != null ? entry.rmOv : '') + '" placeholder="Auto" style="width:70px">';
   row.cells[12].innerHTML = '<input type="number" class="edit-input" id="de-clean-' + id + '" value="' + (entry.rm||0) + '">';
   row.cells[16].innerHTML = '<button class="btn-save" onclick="saveDailyEdit(' + id + ')">Save</button> <button class="btn-cancel" onclick="renderDailyTable()">Cancel</button>';
-  var inputs = [document.getElementById('de-lp-'+id), document.getElementById('de-v-'+id), document.getElementById('de-clean-'+id)];
+  var inputs = [document.getElementById('de-lp-'+id), document.getElementById('de-v-'+id), document.getElementById('de-rmscrub-'+id), document.getElementById('de-clean-'+id)];
   for (var ii = 0; ii < inputs.length; ii++) {
     if (inputs[ii]) inputs[ii].addEventListener('keydown', function(ev) { if (ev.key==='Enter') saveDailyEdit(id); if (ev.key==='Escape') renderDailyTable(); });
   }
@@ -950,17 +953,25 @@ function saveDailyEdit(id) {
   var lpEl = document.getElementById('de-lp-' + id);
   var vEl = document.getElementById('de-v-' + id);
   var clEl = document.getElementById('de-clean-' + id);
+  var rmScrubEl = document.getElementById('de-rmscrub-' + id);
   if (!lpEl || !vEl || !clEl) return;
   var lp = parseInt(lpEl.value) || 0;
   var v = parseInt(vEl.value) || 0;
   var cl = parseInt(clEl.value) || 0;
-  sb.from('dcc_daily_entries').update({ lp_records: lp, v_records: v, rm_records: cl }).eq('id', id).then(function(res) {
+  var rmOv = (rmScrubEl && rmScrubEl.value.trim() !== '') ? parseInt(rmScrubEl.value) : null;
+  sb.from('dcc_daily_entries').update({ lp_records: lp, v_records: v, rm_records: cl, rm_scrubbed_override: rmOv }).eq('id', id).then(function(res) {
     if (res.error) return alert('Error: ' + res.error.message);
     for (var i = 0; i < S.daily.length; i++) {
-      if (S.daily[i].id === id) { S.daily[i].lp = lp; S.daily[i].v = v; S.daily[i].rm = cl; break; }
+      if (S.daily[i].id === id) { S.daily[i].lp = lp; S.daily[i].v = v; S.daily[i].rm = cl; S.daily[i].rmOv = rmOv; break; }
     }
     renderAll();
   });
+}
+
+// Helper: get scrubbed count - uses override if set, otherwise calculates LP - Clean
+function getScrub(e) {
+  if (e.rmOv != null && e.rmOv >= 0) return e.rmOv;
+  return Math.max(0, (e.lp || 0) - (e.rm || 0));
 }
 
 function renderDailyTable() {
@@ -984,7 +995,7 @@ function renderDailyTable() {
     if (!monthTotals[mk]) monthTotals[mk] = { lp:0, v:0, rm:0 };
     monthTotals[mk].lp += (S.daily[i].lp || 0);
     monthTotals[mk].v += (S.daily[i].v || 0);
-    var scrub = Math.max(0, (S.daily[i].lp || 0) - (S.daily[i].rm || 0));
+    var scrub = getScrub(S.daily[i]);
     monthTotals[mk].rm += scrub;
   }
 
@@ -1003,9 +1014,9 @@ function renderDailyTable() {
     var vRate = (mt.v > 0 && vCost > 0) ? vCost / mt.v : 0;
     var rmRate = (mt.rm > 0 && rmCost > 0) ? rmCost / mt.rm : 0;
 
-    // e.rm now stores clean records directly; scrubbed = LP - clean
+    // e.rm stores clean records; scrubbed = override or LP - clean
     var eLp = e.lp || 0, eV = e.v || 0, eClean = e.rm || 0;
-    var eScrub = Math.max(0, eLp - eClean);
+    var eScrub = getScrub(e);
     var lpAlloc = (mt.lp > 0 && eLp > 0) ? (eLp / mt.lp) * lpCost : 0;
     var vAlloc = (mt.v > 0 && eV > 0) ? (eV / mt.v) * vCost : 0;
     var rmAlloc = (mt.rm > 0 && eScrub > 0) ? (eScrub / mt.rm) * rmCost : 0;
@@ -1024,7 +1035,7 @@ function renderDailyTable() {
     html += '<td class="v-cell" style="text-align:right">' + (eV > 0 ? eV.toLocaleString() : d) + '</td>';
     html += '<td class="v-cell" style="text-align:right">' + (vAlloc > 0 ? fmt(vAlloc) : d) + '</td>';
     html += '<td class="v-cell" style="text-align:right">' + (eV > 0 && vRate > 0 ? '$' + vRate.toFixed(4) : d) + '</td>';
-    html += '<td class="rm-cell" style="text-align:right">' + (eScrub > 0 ? eScrub.toLocaleString() : d) + '</td>';
+    html += '<td class="rm-cell" style="text-align:right">' + (eScrub > 0 ? eScrub.toLocaleString() + (e.rmOv != null ? '<sup style="color:#e8913a;font-size:9px;margin-left:1px">M</sup>' : '') : d) + '</td>';
     html += '<td class="rm-cell" style="text-align:right">' + (rmAlloc > 0 ? fmt(rmAlloc) : d) + '</td>';
     html += '<td class="rm-cell" style="text-align:right">' + (eScrub > 0 && rmRate > 0 ? '$' + rmRate.toFixed(4) : d) + '</td>';
     html += '<td class="sum-cell" style="text-align:right">' + (cleanRecs > 0 ? cleanRecs.toLocaleString() : d) + '</td>';
@@ -1349,7 +1360,7 @@ function renderCampaignView() {
   for (var i = 0; i < mDaily.length; i++) {
     var e = mDaily[i];
     var eLp = e.lp || 0, eV = e.v || 0, eClean = e.rm || 0;
-    var eScrub = Math.max(0, eLp - eClean);
+    var eScrub = getScrub(e);
     if (!campPlatRecs[e.camp]) campPlatRecs[e.camp] = {};
     if (eLp > 0) {
       platTotalRecs['Land Portal'] = (platTotalRecs['Land Portal']||0) + eLp;
@@ -1595,7 +1606,7 @@ function renderOverview() {
   var campSet = {};
   for (var i = 0; i < qDaily.length; i++) {
     var de = qDaily[i];
-    var deScrub = Math.max(0, (de.lp || 0) - (de.rm || 0));
+    var deScrub = getScrub(de);
     if (de.lp > 0) platRecs['Land Portal'] = (platRecs['Land Portal']||0) + de.lp;
     if (de.v > 0) platRecs['Versium'] = (platRecs['Versium']||0) + de.v;
     if (deScrub > 0) platRecs['Readymode'] = (platRecs['Readymode']||0) + deScrub;
