@@ -1020,13 +1020,13 @@ function renderDailyTable() {
     html += '<td id="bm-cell-' + e.id + '"><span class="badge b-green">' + monthLabel(mk) + '</span>' + (isAdmin ? '<button class="bm-edit-btn" onclick="editBillingMonth(' + e.id + ')" title="Edit billing month">&#9998;</button>' : '') + '</td>';
     html += '<td class="lp-cell" style="text-align:right">' + (eLp > 0 ? eLp.toLocaleString() : d) + '</td>';
     html += '<td class="lp-cell" style="text-align:right">' + (lpAlloc > 0 ? fmt(lpAlloc) : d) + '</td>';
-    html += '<td class="lp-cell" style="text-align:right">' + (lpRate > 0 ? '$' + lpRate.toFixed(4) : d) + '</td>';
+    html += '<td class="lp-cell" style="text-align:right">' + (eLp > 0 && lpRate > 0 ? '$' + lpRate.toFixed(4) : d) + '</td>';
     html += '<td class="v-cell" style="text-align:right">' + (eV > 0 ? eV.toLocaleString() : d) + '</td>';
     html += '<td class="v-cell" style="text-align:right">' + (vAlloc > 0 ? fmt(vAlloc) : d) + '</td>';
-    html += '<td class="v-cell" style="text-align:right">' + (vRate > 0 ? '$' + vRate.toFixed(4) : d) + '</td>';
+    html += '<td class="v-cell" style="text-align:right">' + (eV > 0 && vRate > 0 ? '$' + vRate.toFixed(4) : d) + '</td>';
     html += '<td class="rm-cell" style="text-align:right">' + (eScrub > 0 ? eScrub.toLocaleString() : d) + '</td>';
     html += '<td class="rm-cell" style="text-align:right">' + (rmAlloc > 0 ? fmt(rmAlloc) : d) + '</td>';
-    html += '<td class="rm-cell" style="text-align:right">' + (rmRate > 0 ? '$' + rmRate.toFixed(4) : d) + '</td>';
+    html += '<td class="rm-cell" style="text-align:right">' + (eScrub > 0 && rmRate > 0 ? '$' + rmRate.toFixed(4) : d) + '</td>';
     html += '<td class="sum-cell" style="text-align:right">' + (cleanRecs > 0 ? cleanRecs.toLocaleString() : d) + '</td>';
     html += '<td class="sum-cell" style="text-align:right">' + (totalCost > 0 ? fmt(totalCost) : d) + '</td>';
     html += '<td class="sum-cell" style="text-align:right">' + fmtBlended(blended) + '</td>';
