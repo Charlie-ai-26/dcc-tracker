@@ -767,6 +767,7 @@ function consolidate(period, fromDate, toDate) {
     var eScrub = getScrub(e);
     var eTotal = eLp + eV + eScrub;
     groups[k].records += eTotal;
+    groups[k].cleanRecs = (groups[k].cleanRecs || 0) + eClean;
     groups[k].byCamp[e.camp] = (groups[k].byCamp[e.camp] || 0) + eTotal;
     if (eLp > 0) groups[k].byPlat['Land Portal'] = (groups[k].byPlat['Land Portal'] || 0) + eLp;
     if (eV > 0) groups[k].byPlat['Versium'] = (groups[k].byPlat['Versium'] || 0) + eV;
@@ -793,32 +794,34 @@ function consolidate(period, fromDate, toDate) {
     var c = filteredCosts[i];
     var ck;
     if (period === 'daily') {
-      // Spread monthly cost across days that have entries in that month
-      var daysInMonth = [];
-      for (var j = 0; j < filtered.length; j++) {
-        if (getMonthKey(filtered[j].date) === c.month) {
-          if (daysInMonth.indexOf(filtered[j].date) < 0) daysInMonth.push(filtered[j].date);
+      // Spread monthly cost across ALL days with entries in that month (using S.daily)
+      // Then only assign to days that exist in filtered groups
+      var allDaysInMonth = [];
+      for (var j = 0; j < S.daily.length; j++) {
+        if (getMonthKey(S.daily[j].date) === c.month) {
+          if (allDaysInMonth.indexOf(S.daily[j].date) < 0) allDaysInMonth.push(S.daily[j].date);
         }
       }
-      if (daysInMonth.length > 0) {
-        var perDay = c.amt / daysInMonth.length;
-        for (var d = 0; d < daysInMonth.length; d++) {
-          if (!groups[daysInMonth[d]]) groups[daysInMonth[d]] = { records: 0, byCamp: {}, byPlat: {}, costByPlat: {} };
-          groups[daysInMonth[d]].costByPlat[c.plat] = (groups[daysInMonth[d]].costByPlat[c.plat] || 0) + perDay;
+      if (allDaysInMonth.length > 0) {
+        var perDay = c.amt / allDaysInMonth.length;
+        for (var d = 0; d < allDaysInMonth.length; d++) {
+          if (!groups[allDaysInMonth[d]]) continue;
+          groups[allDaysInMonth[d]].costByPlat[c.plat] = (groups[allDaysInMonth[d]].costByPlat[c.plat] || 0) + perDay;
         }
       }
     } else if (period === 'weekly') {
-      // Spread monthly cost across all weeks that have entries in this month, proportional to platform records
-      var weekRecs = {}; // { weekKey: platformRecords }
+      // Spread monthly cost across ALL weeks in the month (using S.daily, not filtered)
+      // Then only assign cost to weeks that exist in filtered groups
+      var weekRecs = {};
       var totalPlatRecs = 0;
-      for (var j = 0; j < filtered.length; j++) {
-        var bm = filtered[j].bm || getMonthKey(filtered[j].date);
+      for (var j = 0; j < S.daily.length; j++) {
+        var bm = S.daily[j].bm || getMonthKey(S.daily[j].date);
         if (bm === c.month) {
-          var wk = getWeekKey(filtered[j].date);
+          var wk = getWeekKey(S.daily[j].date);
           var pRecs = 0;
-          if (c.plat === 'Land Portal') pRecs = filtered[j].lp || 0;
-          else if (c.plat === 'Versium') pRecs = filtered[j].v || 0;
-          else if (c.plat === 'Readymode') pRecs = Math.max(0, (filtered[j].lp || 0) - (filtered[j].rm || 0));
+          if (c.plat === 'Land Portal') pRecs = S.daily[j].lp || 0;
+          else if (c.plat === 'Versium') pRecs = S.daily[j].v || 0;
+          else if (c.plat === 'Readymode') pRecs = getScrub(S.daily[j]);
           weekRecs[wk] = (weekRecs[wk] || 0) + pRecs;
           totalPlatRecs += pRecs;
         }
@@ -826,8 +829,8 @@ function consolidate(period, fromDate, toDate) {
       var wkKeys = Object.keys(weekRecs);
       for (var w = 0; w < wkKeys.length; w++) {
         var wKey = wkKeys[w];
-        var share = totalPlatRecs > 0 ? weekRecs[wKey] / totalPlatRecs : 1 / wkKeys.length;
-        if (!groups[wKey]) groups[wKey] = { records: 0, byCamp: {}, byPlat: {}, costByPlat: {} };
+        if (!groups[wKey]) continue;
+        var share = totalPlatRecs > 0 ? weekRecs[wKey] / totalPlatRecs : 0;
         groups[wKey].costByPlat[c.plat] = (groups[wKey].costByPlat[c.plat] || 0) + (c.amt * share);
       }
     } else if (period === 'monthly') {
@@ -1217,7 +1220,7 @@ function renderConsolidation() {
       var vC = (g.costByPlat && g.costByPlat['Versium']) || 0;
       var rmC = (g.costByPlat && g.costByPlat['Readymode']) || 0;
       var totalCost = lpC + vC + rmC;
-      var cleanRecs = lpR - rmR; if (cleanRecs < 0) cleanRecs = 0;
+      var cleanRecs = g.cleanRecs || 0;
       var blended = cleanRecs > 0 ? totalCost / cleanRecs : 0;
       var campCount = Object.keys(g.byCamp).length;
       var campList = [];
