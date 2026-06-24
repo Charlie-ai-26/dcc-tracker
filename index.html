@@ -94,6 +94,20 @@ h3 { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; }
 .b-red { background: #fce4ec; color: #c62828; }
 .b-teal { background: #e0f2f1; color: #00695c; }
 
+/* Credit Gauge */
+.credit-gauge { background: #fff; border-radius: 8px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-bottom: 12px; }
+.credit-gauge h3 { font-size: 12px; font-weight: 600; color: #0f3d2e; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+.credit-gauge h3 .subtitle-tag { font-size: 9px; font-weight: 400; color: #999; background: #f5f5f5; padding: 1px 6px; border-radius: 8px; }
+.gauge-track { background: #e8e8e8; border-radius: 6px; height: 18px; position: relative; overflow: hidden; }
+.gauge-fill { height: 100%; border-radius: 6px; transition: width 0.5s ease; position: relative; }
+.gauge-fill-inner { position: absolute; right: 6px; top: 1px; font-size: 9px; font-weight: 700; color: #fff; line-height: 16px; }
+.gauge-labels { display: flex; justify-content: space-between; font-size: 10px; color: #888; margin-top: 4px; }
+.gauge-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+.gauge-stat { text-align: center; }
+.gauge-stat .gs-label { font-size: 9px; text-transform: uppercase; color: #999; letter-spacing: 0.3px; }
+.gauge-stat .gs-value { font-size: 14px; font-weight: 700; color: #0f3d2e; }
+.gauge-stat .gs-sub { font-size: 9px; color: #bbb; }
+
 /* Period pills */
 .period-tabs { display: flex; gap: 4px; margin-bottom: 12px; }
 .ptab { padding: 4px 12px; border: 1px solid #ddd; border-radius: 5px; background: #fff; font-size: 11px; cursor: pointer; }
@@ -409,6 +423,7 @@ h3 { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; }
       <button class="qb active" onclick="setQ('Q2')">Q2 2026</button>
     </div>
     <div class="kpi-row" id="kpis"></div>
+    <div id="credit-gauge-container"></div>
     <div class="two-col">
       <div class="card"><h3>Monthly Spend Trend</h3><div class="chart-box"><canvas id="spendChart"></canvas></div></div>
       <div class="card"><h3>Platform Cost Share</h3><div class="chart-box"><canvas id="shareChart"></canvas></div></div>
@@ -578,6 +593,12 @@ var sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 var S = { daily: [], costs: [], quarter: 'Q2', period: 'monthly' };
 var isAdmin = false;
 var BLENDED_TARGET = 0.05; // $0.05 per clean record
+var V_QUARTERLY_CREDITS = 1500000; // 1.5M Versium credits per quarter
+function getVCreditRate(month) {
+  var vCost = getCostForMonth(month, 'Versium');
+  if (vCost <= 0) return 0;
+  return (vCost * 3) / V_QUARTERLY_CREDITS; // quarterly cost / 1.5M
+}
 var BLENDED_WARN = 0.04;   // yellow threshold
 var CK = {};
 
@@ -849,6 +870,49 @@ function consolidate(period, fromDate, toDate) {
     }
   }
 
+  // Override Versium cost: use fixed credit rate instead of proportional allocation
+  var gKeys = Object.keys(groups);
+  for (var gi = 0; gi < gKeys.length; gi++) {
+    var gk = gKeys[gi];
+    var g = groups[gk];
+    var vRecs = (g.byPlat && g.byPlat['Versium']) || 0;
+    if (vRecs > 0) {
+      // Determine billing month(s) for this group's entries to get correct rate
+      var vCreditCost = 0;
+      // For monthly/quarterly/yearly, find which months contribute and use their rates
+      if (period === 'monthly') {
+        vCreditCost = vRecs * getVCreditRate(gk);
+      } else if (period === 'quarterly') {
+        // Use first month of quarter for rate (all same subscription)
+        var qMonths = [];
+        for (var mi = 0; mi < S.costs.length; mi++) {
+          if (S.costs[mi].plat === 'Versium') {
+            var qm = parseInt(S.costs[mi].month.substring(5,7));
+            var q = qm <= 3 ? 'Q1' : qm <= 6 ? 'Q2' : qm <= 9 ? 'Q3' : 'Q4';
+            if (q === gk && qMonths.indexOf(S.costs[mi].month) < 0) qMonths.push(S.costs[mi].month);
+          }
+        }
+        vCreditCost = vRecs * (qMonths.length > 0 ? getVCreditRate(qMonths[0]) : 0);
+      } else if (period === 'yearly') {
+        var yMonths = [];
+        for (var mi = 0; mi < S.costs.length; mi++) {
+          if (S.costs[mi].plat === 'Versium' && S.costs[mi].month.substring(0,4) === gk && yMonths.indexOf(S.costs[mi].month) < 0)
+            yMonths.push(S.costs[mi].month);
+        }
+        vCreditCost = vRecs * (yMonths.length > 0 ? getVCreditRate(yMonths[0]) : 0);
+      } else {
+        // daily or weekly: find which billing month this group's entries belong to
+        var entryMonth = null;
+        for (var ei = 0; ei < filtered.length; ei++) {
+          var ek = period === 'daily' ? filtered[ei].date : getWeekKey(filtered[ei].date);
+          if (ek === gk) { entryMonth = filtered[ei].bm || getMonthKey(filtered[ei].date); break; }
+        }
+        vCreditCost = entryMonth ? vRecs * getVCreditRate(entryMonth) : 0;
+      }
+      g.costByPlat['Versium'] = vCreditCost;
+    }
+  }
+
   return groups;
 }
 
@@ -1014,14 +1078,14 @@ function renderDailyTable() {
 
     // Per-platform monthly $/rec
     var lpRate = (mt.lp > 0 && lpCost > 0) ? lpCost / mt.lp : 0;
-    var vRate = (mt.v > 0 && vCost > 0) ? vCost / mt.v : 0;
+    var vRate = getVCreditRate(mk);
     var rmRate = (mt.rm > 0 && rmCost > 0) ? rmCost / mt.rm : 0;
 
     // e.rm stores clean records; scrubbed = override or LP - clean
     var eLp = e.lp || 0, eV = e.v || 0, eClean = e.rm || 0;
     var eScrub = getScrub(e);
     var lpAlloc = (mt.lp > 0 && eLp > 0) ? (eLp / mt.lp) * lpCost : 0;
-    var vAlloc = (mt.v > 0 && eV > 0) ? (eV / mt.v) * vCost : 0;
+    var vAlloc = (eV > 0 && vRate > 0) ? eV * vRate : 0;
     var rmAlloc = (mt.rm > 0 && eScrub > 0) ? (eScrub / mt.rm) * rmCost : 0;
     var totalCost = lpAlloc + vAlloc + rmAlloc;
     var cleanRecs = eClean;
@@ -1381,7 +1445,7 @@ function renderCampaignView() {
 
   // $/Record per platform
   var lpCpr = (platTotalRecs['Land Portal'] > 0 && lpCostTotal > 0) ? lpCostTotal / platTotalRecs['Land Portal'] : 0;
-  var vCpr = (platTotalRecs['Versium'] > 0 && vCostTotal > 0) ? vCostTotal / platTotalRecs['Versium'] : 0;
+  var vCpr = getVCreditRate(selMonth); // fixed $/credit rate
   var rmCpr = (platTotalRecs['Readymode'] > 0 && rmCostTotal > 0) ? rmCostTotal / platTotalRecs['Readymode'] : 0;
 
   // Build rows matching Excel structure
@@ -1397,7 +1461,7 @@ function renderCampaignView() {
 
     // Allocated costs
     var lpAlloc = (platTotalRecs['Land Portal'] > 0 && lpR > 0) ? (lpR / platTotalRecs['Land Portal']) * lpCostTotal : 0;
-    var vAlloc = (platTotalRecs['Versium'] > 0 && vR > 0) ? (vR / platTotalRecs['Versium']) * vCostTotal : 0;
+    var vAlloc = (vR > 0 && vCpr > 0) ? vR * vCpr : 0;
     var rmAlloc = (platTotalRecs['Readymode'] > 0 && rmR > 0) ? (rmR / platTotalRecs['Readymode']) * rmCostTotal : 0;
     var totalCost = lpAlloc + vAlloc + rmAlloc;
 
@@ -1560,7 +1624,7 @@ function renderEffChart(platTotalRecs, lpCost, vCost, rmCost, combinedCost, tota
   if (platTotalRecs['Land Portal'] > 0 && lpCost > 0)
     effData.push({ name: 'Land Portal', cpr: lpCost / platTotalRecs['Land Portal'], color: '#1a5c44' });
   if (platTotalRecs['Versium'] > 0 && vCost > 0)
-    effData.push({ name: 'Versium', cpr: vCost / platTotalRecs['Versium'], color: '#0f3d2e' });
+    effData.push({ name: 'Versium', cpr: getVCreditRate(document.getElementById('camp-month-sel').value), color: '#0f3d2e' });
   if (platTotalRecs['Readymode'] > 0 && rmCost > 0)
     effData.push({ name: 'RM (Scrubbed)', cpr: rmCost / platTotalRecs['Readymode'], color: '#e8913a' });
 
@@ -1587,6 +1651,69 @@ function setQ(q) {
     else btns[i].classList.remove('active');
   }
   renderOverview();
+}
+
+function renderCreditGauge(months) {
+  var container = document.getElementById('credit-gauge-container');
+  if (!container) return;
+
+  // Sum V records for selected quarter months
+  var usedCredits = 0;
+  for (var i = 0; i < S.daily.length; i++) {
+    var eMo = getMonthKey(S.daily[i].date);
+    if (months.indexOf(eMo) >= 0) {
+      usedCredits += (S.daily[i].v || 0);
+    }
+  }
+
+  var cap = V_QUARTERLY_CREDITS;
+  var pct = cap > 0 ? (usedCredits / cap) * 100 : 0;
+  var remaining = Math.max(0, cap - usedCredits);
+  var monthsElapsed = 0;
+  var now = new Date();
+  for (var m = 0; m < months.length; m++) {
+    var parts = months[m].split('-');
+    var moDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
+    if (moDate <= now) monthsElapsed++;
+  }
+  var expectedPct = months.length > 0 ? (monthsElapsed / months.length) * 100 : 0;
+  var burnRate = monthsElapsed > 0 ? usedCredits / monthsElapsed : 0;
+  var projectedTotal = burnRate * months.length;
+  var projectedPct = cap > 0 ? (projectedTotal / cap) * 100 : 0;
+
+  // Rate from subscription
+  var creditRate = 0;
+  for (var mi = 0; mi < months.length; mi++) {
+    creditRate = getVCreditRate(months[mi]);
+    if (creditRate > 0) break;
+  }
+
+  // Color: green if on pace or under, yellow if 80-100%, red if over
+  var barColor = pct <= 70 ? '#2e7d32' : pct <= 90 ? '#e8913a' : pct <= 100 ? '#d84315' : '#c62828';
+  var statusText = pct > 100 ? 'OVER CAP' : pct > 90 ? 'Near cap' : pct > 70 ? 'Watch pace' : 'On track';
+  var statusColor = pct > 100 ? '#c62828' : pct > 90 ? '#d84315' : pct > 70 ? '#e8913a' : '#2e7d32';
+
+  container.innerHTML = '<div class="credit-gauge">' +
+    '<h3>Versium Credit Utilization <span class="subtitle-tag">' + S.quarter + ' 2026</span> ' +
+    '<span style="margin-left:auto;font-size:10px;font-weight:600;color:' + statusColor + '">' + statusText + '</span></h3>' +
+    '<div class="gauge-track">' +
+      '<div class="gauge-fill" style="width:' + Math.min(pct, 100) + '%;background:' + barColor + '">' +
+        '<span class="gauge-fill-inner">' + pct.toFixed(1) + '%</span>' +
+      '</div>' +
+    '</div>' +
+    '<div class="gauge-labels" style="position:relative">' +
+      '<span>0</span>' +
+      '<span style="position:absolute;left:' + expectedPct + '%;transform:translateX(-50%);color:#0f3d2e;font-weight:600;font-size:9px">' +
+        '\u25BC expected pace</span>' +
+      '<span>' + (cap / 1000000).toFixed(1) + 'M</span>' +
+    '</div>' +
+    '<div class="gauge-stats">' +
+      '<div class="gauge-stat"><div class="gs-label">Used</div><div class="gs-value">' + (usedCredits / 1000).toFixed(0) + 'K</div><div class="gs-sub">of ' + (cap / 1000000).toFixed(1) + 'M</div></div>' +
+      '<div class="gauge-stat"><div class="gs-label">Remaining</div><div class="gs-value">' + (remaining / 1000).toFixed(0) + 'K</div><div class="gs-sub">credits left</div></div>' +
+      '<div class="gauge-stat"><div class="gs-label">Burn Rate</div><div class="gs-value">' + (burnRate / 1000).toFixed(0) + 'K</div><div class="gs-sub">/month avg</div></div>' +
+      '<div class="gauge-stat"><div class="gs-label">$/Credit</div><div class="gs-value">$' + (creditRate > 0 ? creditRate.toFixed(4) : '—') + '</div><div class="gs-sub">fixed rate</div></div>' +
+    '</div>' +
+  '</div>';
 }
 
 function renderOverview() {
@@ -1630,7 +1757,12 @@ function renderOverview() {
   var rmS = platSpend['Readymode'] || 0;
 
   var lpCpr = lpR > 0 && lpS > 0 ? lpS / lpR : 0;
-  var vCpr = vR > 0 && vS > 0 ? vS / vR : 0;
+  // Versium uses fixed credit rate; find any month in quarter for the rate
+  var vCpr = 0;
+  for (var vi = 0; vi < months.length; vi++) {
+    var vr = getVCreditRate(months[vi]);
+    if (vr > 0) { vCpr = vr; break; }
+  }
   var rmCpr = rmR > 0 && rmS > 0 ? rmS / rmR : 0;
   var cleanRecs = lpR - rmR;
   var blendedCpr = cleanRecs > 0 && totalSpend > 0 ? totalSpend / cleanRecs : 0;
@@ -1638,7 +1770,7 @@ function renderOverview() {
   $('kpis').innerHTML =
     '<div class="kpi-card"><div class="kpi-label">Total Spend (' + S.quarter + ')</div><div class="kpi-value">' + fmt(totalSpend) + '</div><div class="kpi-sub">All platforms combined</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">Land Portal</div><div class="kpi-value">' + (lpR > 0 ? fmtK(lpR) + ' recs' : '—') + '</div><div class="kpi-sub">' + (lpCpr > 0 ? '$' + lpCpr.toFixed(4) + '/rec | ' + fmt(lpS) : 'No cost data') + '</div></div>' +
-    '<div class="kpi-card"><div class="kpi-label">Versium</div><div class="kpi-value">' + (vR > 0 ? fmtK(vR) + ' recs' : '—') + '</div><div class="kpi-sub">' + (vCpr > 0 ? '$' + vCpr.toFixed(4) + '/rec | ' + fmt(vS) : 'No cost data') + '</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">Versium <span style="font-size:8px;color:#999">credit-based</span></div><div class="kpi-value">' + (vR > 0 ? fmtK(vR) + ' credits' : '—') + '</div><div class="kpi-sub">' + (vCpr > 0 ? '$' + vCpr.toFixed(4) + '/credit | ' + fmt(vS) + ' subscription' : 'No cost data') + '</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">Readymode (Scrubbed off)</div><div class="kpi-value">' + (rmR > 0 ? fmtK(rmR) + ' recs' : '—') + '</div><div class="kpi-sub">' + (rmCpr > 0 ? '$' + rmCpr.toFixed(4) + '/rec | ' + fmt(rmS) : 'No cost data') + '</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">Blended $/Record <span style="font-size:9px;color:#888">(target: $' + BLENDED_TARGET.toFixed(2) + ')</span></div><div class="kpi-value ' + blendedClass(blendedCpr) + '">' + (blendedCpr > 0 ? blendedDot(blendedCpr) + '$' + blendedCpr.toFixed(4) : '—') + '</div><div class="kpi-sub">' + (cleanRecs > 0 ? fmtK(cleanRecs) + ' clean records' : 'No data') + '</div></div>' +
     '<div class="kpi-card" style="cursor:pointer" onclick="var el=document.getElementById(\'overview-camp-expand\');if(el)el.style.display=el.style.display===\'none\'?\'block\':\'none\'"><div class="kpi-label">Campaigns <span style=\"font-size:9px;color:#888\">(click to expand)</span></div><div class="kpi-value">' + (campCount || DATA_CAMPAIGNS.length) + '</div><div class="kpi-sub">' + (campCount > 0 ? 'With recorded data' : 'From Command Center') + '</div></div>';
@@ -1647,6 +1779,9 @@ function renderOverview() {
   for (var ci = 0; ci < overviewCampList.length; ci++) { ovHtml += '<span style="white-space:nowrap"><strong>' + overviewCampList[ci].name.replace(/'/g,"&#39;") + '</strong> <span class="muted">(' + overviewCampList[ci].recs.toLocaleString() + ' clean)</span></span>'; }
   ovHtml += '</div></div>';
   $('kpis').insertAdjacentHTML('afterend', ovHtml);
+
+  // Credit utilization gauge
+  renderCreditGauge(months);
 
   // Spend chart
   destroyChart('spend');
