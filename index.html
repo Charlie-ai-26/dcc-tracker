@@ -275,14 +275,17 @@ h3 { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; }
       </div>
       <div class="flex-b mt">
         <h3>Entries</h3>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <select id="d-month-sel" onchange="renderDailyTable()" style="font-size:11px;padding:3px 6px;border:1px solid #ddd;border-radius:4px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <select id="d-month-sel" onchange="$('d-from').value='';$('d-to').value='';renderDailyTable()" style="font-size:11px;padding:3px 6px;border:1px solid #ddd;border-radius:4px;">
             <option value="">All Months</option>
-            <option value="2026-04">April 2026</option>
-            <option value="2026-05">May 2026</option>
-            <option value="2026-06">June 2026</option>
           </select>
+          <span class="muted" style="font-size:10px;">or</span>
+          <input type="date" id="d-from" onchange="$('d-month-sel').value='';renderDailyTable()" style="font-size:11px;padding:3px 6px;border:1px solid #ddd;border-radius:4px;max-width:130px;" title="From date">
+          <span class="muted" style="font-size:10px;">→</span>
+          <input type="date" id="d-to" onchange="$('d-month-sel').value='';renderDailyTable()" style="font-size:11px;padding:3px 6px;border:1px solid #ddd;border-radius:4px;max-width:130px;" title="To date">
+          <button class="btn btn-o" onclick="clearDailyFilter()" style="font-size:10px;padding:2px 8px;">Clear</button>
           <span class="muted" id="daily-count">0 entries</span>
+          <span class="muted" id="daily-range-label" style="font-size:10px;"></span>
         </div>
       </div>
       <div style="overflow-x:auto;">
@@ -417,11 +420,17 @@ h3 { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; }
     <div class="card">
       <div class="flex-b">
         <h2>Per-Campaign Cost Breakdown</h2>
-        <div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <span class="muted" id="camp-month-label">Viewing: </span>
-          <select id="camp-month-sel" onchange="renderCampaignView()" style="font-size:11px;padding:3px 6px;border:1px solid #ddd;border-radius:4px;">
+          <select id="camp-month-sel" onchange="$('camp-from').value='';$('camp-to').value='';renderCampaignView()" style="font-size:11px;padding:3px 6px;border:1px solid #ddd;border-radius:4px;">
             <option value="2026-04" selected>April 2026</option>
           </select>
+          <span class="muted" style="font-size:10px;">or</span>
+          <input type="date" id="camp-from" onchange="$('camp-month-sel').value='';renderCampaignView()" style="font-size:11px;padding:3px 6px;border:1px solid #ddd;border-radius:4px;max-width:130px;" title="From date">
+          <span class="muted" style="font-size:10px;">→</span>
+          <input type="date" id="camp-to" onchange="$('camp-month-sel').value='';renderCampaignView()" style="font-size:11px;padding:3px 6px;border:1px solid #ddd;border-radius:4px;max-width:130px;" title="To date">
+          <button class="btn btn-o" onclick="clearCampFilter()" style="font-size:10px;padding:2px 8px;">Clear</button>
+          <span class="muted" id="camp-range-label" style="font-size:10px;"></span>
         </div>
       </div>
       <p class="muted mb">Cost allocated by usage: (campaign platform records / total platform records) × platform cost. Clean Records = Land Portal − Dialer scrubbed.</p>
@@ -442,9 +451,17 @@ h3 { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; }
 
   <!-- ========== OVERVIEW ========== -->
   <div id="tab-overview" class="tab-content">
-    <div class="q-sel">
-      <button class="qb" onclick="setQ('Q1')">Q1 2026</button>
-      <button class="qb active" onclick="setQ('Q2')">Q2 2026</button>
+    <div class="q-sel" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div>
+        <button class="qb" onclick="setQ('Q1')">Q1 2026</button>
+        <button class="qb active" onclick="setQ('Q2')">Q2 2026</button>
+      </div>
+      <span class="muted" style="font-size:10px;">or custom range:</span>
+      <input type="date" id="ov-from" onchange="clearQSel();renderOverview()" style="font-size:11px;padding:3px 6px;border:1px solid #ddd;border-radius:4px;max-width:130px;" title="From date">
+      <span class="muted" style="font-size:10px;">→</span>
+      <input type="date" id="ov-to" onchange="clearQSel();renderOverview()" style="font-size:11px;padding:3px 6px;border:1px solid #ddd;border-radius:4px;max-width:130px;" title="To date">
+      <button class="btn btn-o" onclick="clearOvFilter()" style="font-size:10px;padding:2px 8px;">Clear</button>
+      <span class="muted" id="ov-range-label" style="font-size:10px;"></span>
     </div>
     <div class="kpi-row" id="kpis"></div>
     <div id="credit-gauge-container"></div>
@@ -1111,14 +1128,38 @@ function getScrub(e) {
   return Math.max(0, (e.lp || 0) - (e.rm || 0));
 }
 
+function clearDailyFilter() {
+  $('d-month-sel').value = '';
+  $('d-from').value = '';
+  $('d-to').value = '';
+  renderDailyTable();
+}
 function renderDailyTable() {
   var selMonth = $('d-month-sel') ? $('d-month-sel').value : '';
+  var dFrom = $('d-from') ? $('d-from').value : '';
+  var dTo = $('d-to') ? $('d-to').value : '';
   var filtered = S.daily;
   if (selMonth) {
     filtered = S.daily.filter(function(e) { return (e.bm || getMonthKey(e.date)) === selMonth; });
+  } else if (dFrom || dTo) {
+    filtered = S.daily.filter(function(e) {
+      if (dFrom && e.date < dFrom) return false;
+      if (dTo && e.date > dTo) return false;
+      return true;
+    });
   }
   var sorted = filtered.slice().sort(function(a,b) { return b.date.localeCompare(a.date) || b.id - a.id; });
   $('daily-count').textContent = sorted.length + ' entries';
+  // Update range label
+  var drl = $('daily-range-label');
+  if (drl) {
+    if (dFrom || dTo) {
+      var parts = [];
+      if (dFrom) parts.push(dateLabel(dFrom));
+      if (dTo) parts.push(dateLabel(dTo));
+      drl.textContent = 'Filtered: ' + (dFrom && dTo ? parts[0] + ' → ' + parts[1] : dFrom ? 'From ' + parts[0] : 'Through ' + parts[0]);
+    } else { drl.textContent = ''; }
+  }
 
   if (sorted.length === 0) {
     $('daily-body').innerHTML = '<tr><td colspan="17" class="empty">No entries yet. Log your first daily record above.</td></tr>';
@@ -1483,14 +1524,56 @@ function renderSpendTrend(groups) {
 }
 
 // --- CAMPAIGN REVIEW ---
+function clearCampFilter() {
+  $('camp-from').value = '';
+  $('camp-to').value = '';
+  renderCampaignView();
+}
 function renderCampaignView() {
-  var selMonth = $('camp-month-sel').value;
-  var lpCostTotal = getCostForMonth(selMonth, 'Land Portal');
-  var vCostTotal = getCostForMonth(selMonth, 'Versium');
-  var rmCostTotal = getCostForMonth(selMonth, 'Readymode');
+  var selMonth = $('camp-month-sel') ? $('camp-month-sel').value : '';
+  var campFrom = $('camp-from') ? $('camp-from').value : '';
+  var campTo = $('camp-to') ? $('camp-to').value : '';
+  var useRange = !selMonth && (campFrom || campTo);
 
-  // Filter daily entries for selected billing month
-  var mDaily = S.daily.filter(function(e) { return (e.bm || getMonthKey(e.date)) === selMonth; });
+  // Update range label
+  var crl = $('camp-range-label');
+  if (crl) {
+    if (useRange) {
+      var parts = [];
+      if (campFrom) parts.push(dateLabel(campFrom));
+      if (campTo) parts.push(dateLabel(campTo));
+      crl.textContent = 'Filtered: ' + (campFrom && campTo ? parts[0] + ' → ' + parts[1] : campFrom ? 'From ' + parts[0] : 'Through ' + parts[0]);
+    } else { crl.textContent = ''; }
+  }
+
+  // Filter daily entries
+  var mDaily;
+  if (useRange) {
+    mDaily = S.daily.filter(function(e) {
+      if (campFrom && e.date < campFrom) return false;
+      if (campTo && e.date > campTo) return false;
+      return true;
+    });
+  } else {
+    mDaily = S.daily.filter(function(e) { return (e.bm || getMonthKey(e.date)) === selMonth; });
+  }
+
+  // Determine cost totals — for range, sum across relevant billing months
+  var lpCostTotal = 0, vCostTotal = 0, rmCostTotal = 0;
+  if (useRange) {
+    var bMonths = {};
+    for (var bi = 0; bi < mDaily.length; bi++) { bMonths[mDaily[bi].bm || getMonthKey(mDaily[bi].date)] = true; }
+    var bmk = Object.keys(bMonths);
+    for (var bi = 0; bi < bmk.length; bi++) {
+      lpCostTotal += getCostForMonth(bmk[bi], 'Land Portal');
+      vCostTotal += getCostForMonth(bmk[bi], 'Versium');
+      rmCostTotal += getCostForMonth(bmk[bi], 'Readymode');
+    }
+  } else {
+    lpCostTotal = getCostForMonth(selMonth, 'Land Portal');
+    vCostTotal = getCostForMonth(selMonth, 'Versium');
+    rmCostTotal = getCostForMonth(selMonth, 'Readymode');
+  }
 
   // Platform totals
   var platTotalRecs = {};
@@ -1700,7 +1783,7 @@ function renderEffChart(platTotalRecs, lpCost, vCost, rmCost, combinedCost, tota
   if (platTotalRecs['Land Portal'] > 0 && lpCost > 0)
     effData.push({ name: 'Land Portal', cpr: lpCost / platTotalRecs['Land Portal'], color: '#1a5c44' });
   if (platTotalRecs['Versium'] > 0 && vCost > 0)
-    effData.push({ name: 'Versium', cpr: getVCreditRate(document.getElementById('camp-month-sel').value), color: '#0f3d2e' });
+    effData.push({ name: 'Versium', cpr: (useRange && mDaily.length > 0 ? getVCreditRate(mDaily[0].bm || getMonthKey(mDaily[0].date)) : getVCreditRate(selMonth)), color: '#0f3d2e' });
   if (platTotalRecs['Readymode'] > 0 && rmCost > 0)
     effData.push({ name: 'RM (Scrubbed)', cpr: rmCost / platTotalRecs['Readymode'], color: '#e8913a' });
 
@@ -1721,6 +1804,9 @@ function renderEffChart(platTotalRecs, lpCost, vCost, rmCost, combinedCost, tota
 // --- OVERVIEW ---
 function setQ(q) {
   S.quarter = q;
+  if ($('ov-from')) $('ov-from').value = '';
+  if ($('ov-to')) $('ov-to').value = '';
+  if ($('ov-range-label')) $('ov-range-label').textContent = '';
   var btns = document.querySelectorAll('.qb');
   for (var i = 0; i < btns.length; i++) {
     if (btns[i].textContent.indexOf(q) >= 0) btns[i].classList.add('active');
@@ -1865,10 +1951,53 @@ function renderCreditGauge(months) {
   '</div>';
 }
 
+function clearQSel() {
+  var qbs = document.querySelectorAll('.qb');
+  for (var i = 0; i < qbs.length; i++) qbs[i].classList.remove('active');
+}
+function clearOvFilter() {
+  $('ov-from').value = '';
+  $('ov-to').value = '';
+  // Re-activate the current quarter button
+  var qbs = document.querySelectorAll('.qb');
+  for (var i = 0; i < qbs.length; i++) {
+    if (qbs[i].textContent.indexOf(S.quarter) >= 0) qbs[i].classList.add('active');
+  }
+  renderOverview();
+}
 function renderOverview() {
-  var months = qMonths(S.quarter);
+  var ovFrom = $('ov-from') ? $('ov-from').value : '';
+  var ovTo = $('ov-to') ? $('ov-to').value : '';
+  var useRange = ovFrom || ovTo;
+  var months;
+  var rangeTitle = S.quarter;
 
-  // Quarter costs
+  // Update range label
+  var orl = $('ov-range-label');
+  if (orl) {
+    if (useRange) {
+      var parts = [];
+      if (ovFrom) parts.push(dateLabel(ovFrom));
+      if (ovTo) parts.push(dateLabel(ovTo));
+      orl.textContent = 'Filtered: ' + (ovFrom && ovTo ? parts[0] + ' → ' + parts[1] : ovFrom ? 'From ' + parts[0] : 'Through ' + parts[0]);
+    } else { orl.textContent = ''; }
+  }
+
+  if (useRange) {
+    // Determine which months fall within the range
+    var allMonths = {};
+    for (var i = 0; i < S.daily.length; i++) {
+      var em = getMonthKey(S.daily[i].date);
+      allMonths[em] = true;
+    }
+    for (var i = 0; i < S.costs.length; i++) { allMonths[S.costs[i].month] = true; }
+    months = Object.keys(allMonths).sort();
+    rangeTitle = 'Custom Range';
+  } else {
+    months = qMonths(S.quarter);
+  }
+
+  // Costs for the period
   var platSpend = {};
   var totalSpend = 0;
   for (var i = 0; i < S.costs.length; i++) {
@@ -1879,8 +2008,17 @@ function renderOverview() {
     }
   }
 
-  // Quarter records
-  var qDaily = S.daily.filter(function(e) { return months.indexOf(getMonthKey(e.date)) >= 0; });
+  // Records for the period
+  var qDaily;
+  if (useRange) {
+    qDaily = S.daily.filter(function(e) {
+      if (ovFrom && e.date < ovFrom) return false;
+      if (ovTo && e.date > ovTo) return false;
+      return true;
+    });
+  } else {
+    qDaily = S.daily.filter(function(e) { return months.indexOf(getMonthKey(e.date)) >= 0; });
+  }
   var platRecs = {};
   var campSet = {};
   for (var i = 0; i < qDaily.length; i++) {
@@ -1917,7 +2055,7 @@ function renderOverview() {
   var blendedCpr = cleanRecs > 0 && totalSpend > 0 ? totalSpend / cleanRecs : 0;
 
   $('kpis').innerHTML =
-    '<div class="kpi-card"><div class="kpi-label">Total Spend (' + S.quarter + ')</div><div class="kpi-value">' + fmt(totalSpend) + '</div><div class="kpi-sub">All platforms combined</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">Total Spend (' + rangeTitle + ')</div><div class="kpi-value">' + fmt(totalSpend) + '</div><div class="kpi-sub">All platforms combined</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">Land Portal</div><div class="kpi-value">' + (lpR > 0 ? fmtK(lpR) + ' recs' : '—') + '</div><div class="kpi-sub">' + (lpCpr > 0 ? '$' + lpCpr.toFixed(4) + '/rec | ' + fmt(lpS) : 'No cost data') + '</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">Versium <span style="font-size:8px;color:#999">credit-based</span></div><div class="kpi-value">' + (vR > 0 ? fmtK(vR) + ' credits' : '—') + '</div><div class="kpi-sub">' + (vCpr > 0 ? '$' + vCpr.toFixed(4) + '/credit | ' + fmt(vS) + ' subscription' : 'No cost data') + '</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">Readymode (Scrubbed off)</div><div class="kpi-value">' + (rmR > 0 ? fmtK(rmR) + ' recs' : '—') + '</div><div class="kpi-sub">' + (rmCpr > 0 ? '$' + rmCpr.toFixed(4) + '/rec | ' + fmt(rmS) : 'No cost data') + '</div></div>' +
