@@ -108,11 +108,6 @@ h3 { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; }
 .gauge-stat .gs-value { font-size: 14px; font-weight: 700; color: #0f3d2e; }
 .gauge-stat .gs-sub { font-size: 9px; color: #bbb; }
 
-/* Period pills */
-.period-tabs { display: flex; gap: 4px; margin-bottom: 12px; }
-.ptab { padding: 4px 12px; border: 1px solid #ddd; border-radius: 5px; background: #fff; font-size: 11px; cursor: pointer; }
-.ptab.active { background: #0f3d2e; color: #fff; border-color: #0f3d2e; }
-
 /* Quarter selector */
 .q-sel { display: flex; gap: 4px; margin-bottom: 12px; }
 .qb { padding: 4px 12px; border: 1px solid #ddd; border-radius: 5px; background: #fff; font-size: 11px; cursor: pointer; }
@@ -228,13 +223,12 @@ h3 { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; }
 <body>
 <div class="container">
   <h1>Data Cost Control Tracker</h1>
-  <p class="subtitle">Land AI — Source of truth: <a href="https://cc.landai.ai/campaigns" target="_blank" style="color:#0f3d2e">Command Center</a> | Daily entries consolidate to weekly / monthly / quarterly / yearly | <span style="color:#0f3d2e;cursor:pointer;" onclick="load(function(){renderAll();})" title="Refresh data from database">&#x21bb; Refresh</span> | <span id="admin-lock" class="admin-lock" onclick="toggleAdmin()" title="Toggle admin mode">&#x1f512;</span></p>
+  <p class="subtitle">Land AI — Source of truth: <a href="https://cc.landai.ai/campaigns" target="_blank" style="color:#0f3d2e">Command Center</a> | Daily entries roll up by campaign, month &amp; quarter | <span style="color:#0f3d2e;cursor:pointer;" onclick="load(function(){renderAll();})" title="Refresh data from database">&#x21bb; Refresh</span> | <span id="admin-lock" class="admin-lock" onclick="toggleAdmin()" title="Toggle admin mode">&#x1f512;</span></p>
 
   <p class="muted" id="load-status" style="font-size:11px;margin-bottom:4px;">Loading data from database...</p>
   <div class="tabs">
     <button class="tab active" onclick="switchTab('daily', this)">Daily Entry</button>
     <button class="tab" onclick="switchTab('costs', this)">Platform Costs</button>
-    <button class="tab" onclick="switchTab('consolidation', this)">Consolidation</button>
     <button class="tab" onclick="switchTab('campaigns', this)">Campaign Review</button>
     <button class="tab" onclick="switchTab('overview', this)">Overview</button>
     <button class="tab" onclick="switchTab('methodology', this)">Methodology</button>
@@ -382,39 +376,6 @@ h3 { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; }
     </div>
   </div>
 
-  <!-- ========== CONSOLIDATION ========== -->
-  <div id="tab-consolidation" class="tab-content">
-    <div class="card">
-      <div class="flex-b">
-        <h2>Record & Cost Consolidation</h2>
-        <div class="period-tabs">
-          <button class="ptab" onclick="setPeriod('daily')">Daily</button>
-          <button class="ptab" onclick="setPeriod('weekly')">Weekly</button>
-          <button class="ptab active" onclick="setPeriod('monthly')">Monthly</button>
-          <button class="ptab" onclick="setPeriod('quarterly')">Quarterly</button>
-          <button class="ptab" onclick="setPeriod('yearly')">Yearly</button>
-        </div>
-      </div>
-      <div class="form-row" style="margin-bottom:12px; align-items:center;">
-        <div class="fg" style="max-width:150px"><label>From</label><input type="date" id="con-from" onchange="renderConsolidation()"></div>
-        <div class="fg" style="max-width:150px"><label>To</label><input type="date" id="con-to" onchange="renderConsolidation()"></div>
-        <button class="btn btn-o" onclick="clearConFilter()" style="margin-top:14px;font-size:11px;">Clear</button>
-        <span class="muted" id="con-range-label" style="margin-top:14px;"></span>
-      </div>
-      <div id="consolidation-grid"></div>
-    </div>
-    <div class="two-col mt">
-      <div class="card">
-        <h3>Records by Platform Over Time</h3>
-        <div class="chart-box"><canvas id="recordsTrendChart"></canvas></div>
-      </div>
-      <div class="card">
-        <h3>Spend by Platform Over Time</h3>
-        <div class="chart-box"><canvas id="spendVsRecordsChart"></canvas></div>
-      </div>
-    </div>
-  </div>
-
   <!-- ========== CAMPAIGN REVIEW ========== -->
   <div id="tab-campaigns" class="tab-content">
     <div class="card">
@@ -469,6 +430,16 @@ h3 { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; }
       <div class="card"><h3>Monthly Spend Trend</h3><div class="chart-box"><canvas id="spendChart"></canvas></div></div>
       <div class="card"><h3>Platform Cost Share</h3><div class="chart-box"><canvas id="shareChart"></canvas></div></div>
     </div>
+    <div class="two-col mt">
+      <div class="card">
+        <h3>Records by Platform Over Time</h3>
+        <div class="chart-box"><canvas id="recordsTrendChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Spend by Platform Over Time</h3>
+        <div class="chart-box"><canvas id="spendVsRecordsChart"></canvas></div>
+      </div>
+    </div>
   </div>
 
   <!-- ========== METHODOLOGY ========== -->
@@ -479,7 +450,7 @@ h3 { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; }
 
       <div class="mbox"><h4>Data Flow</h4>
         <p><strong>Entry:</strong> Data processors enter records processed daily — campaign, record count, platform, and their name.</p>
-        <p><strong>Consolidation:</strong> Daily entries automatically roll up: Daily → Weekly (Sun-Sat) → Monthly → Quarterly → Yearly.</p>
+        <p><strong>Roll-up:</strong> Daily entries are aggregated by campaign, month, and quarter across all tabs.</p>
         <p><strong>Costs:</strong> Platform invoices are entered monthly in the Platform Costs tab (Land Portal, Versium, Readymode).</p>
         <p><strong>Campaigns:</strong> Campaign names, tiers, and status come from the Command Center (cc.landai.ai/campaigns).</p>
       </div>
@@ -631,7 +602,7 @@ var sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 // ============================================================
 // STATE
 // ============================================================
-var S = { daily: [], costs: [], credits: [], quarter: 'Q2', period: 'monthly' };
+var S = { daily: [], costs: [], credits: [], quarter: 'Q2' };
 var isAdmin = false;
 var BLENDED_TARGET = 0.05; // $0.05 per clean record
 function getQuarterForMonth(month) {
@@ -1003,9 +974,7 @@ function renderAll() {
   renderDailyTable();
   renderCostTable();
   renderCreditsTable();
-  renderCreditsTable();
   renderPlatformChart();
-  renderConsolidation();
   renderCampaignView();
   renderOverview();
   populateDropdown();
@@ -1346,144 +1315,12 @@ function renderPlatformChart() {
   });
 }
 
-// --- CONSOLIDATION ---
-function setPeriod(p) {
-  S.period = p;
-  var btns = document.querySelectorAll('.ptab');
-  for (var i = 0; i < btns.length; i++) {
-    if (btns[i].textContent.toLowerCase() === p) btns[i].classList.add('active');
-    else btns[i].classList.remove('active');
-  }
-  renderConsolidation();
-}
-
-function clearConFilter() {
-  $('con-from').value = '';
-  $('con-to').value = '';
-  renderConsolidation();
-}
-
-function renderConsolidation() {
-  var fromDate = $('con-from').value || '';
-  var toDate = $('con-to').value || '';
-  var groups = consolidate(S.period, fromDate, toDate);
-  var container = $('consolidation-grid');
-  var keys = Object.keys(groups).sort().reverse();
-
-  // Update range label
-  var rangeLabel = $('con-range-label');
-  if (fromDate || toDate) {
-    var parts = [];
-    if (fromDate) parts.push(dateLabel(fromDate));
-    if (toDate) parts.push(dateLabel(toDate));
-    rangeLabel.textContent = 'Filtered: ' + (fromDate && toDate ? parts[0] + ' → ' + parts[1] : fromDate ? 'From ' + parts[0] : 'Through ' + parts[0]);
-  } else {
-    rangeLabel.textContent = '';
-  }
-
-  if (keys.length === 0) {
-    container.innerHTML = '<p class="empty">No data yet. Add daily entries to see consolidation.</p>';
-  } else {
-    // Build rows with WoW change tracking
-    var rowData = [];
-    for (var i = 0; i < keys.length; i++) {
-      var k = keys[i];
-      var g = groups[k];
-      var lpR = g.byPlat['Land Portal'] || 0;
-      var vR = g.byPlat['Versium'] || 0;
-      var rmR = g.byPlat['Readymode'] || 0;
-      var lpC = (g.costByPlat && g.costByPlat['Land Portal']) || 0;
-      var vC = (g.costByPlat && g.costByPlat['Versium']) || 0;
-      var rmC = (g.costByPlat && g.costByPlat['Readymode']) || 0;
-      var totalCost = lpC + vC + rmC;
-      var cleanRecs = g.cleanRecs || 0;
-      var blended = cleanRecs > 0 ? totalCost / cleanRecs : 0;
-      var campCount = Object.keys(g.byCamp).length;
-      var campList = [];
-      var campKeys = Object.keys(g.byCamp);
-      for (var ci = 0; ci < campKeys.length; ci++) campList.push({ name: campKeys[ci], recs: g.byCamp[campKeys[ci]] });
-      campList.sort(function(a,b) { return b.recs - a.recs; });
-
-      var label;
-      if (S.period === 'daily') label = dateLabel(k);
-      else if (S.period === 'weekly') label = 'W/O ' + new Date(k+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
-      else if (S.period === 'quarterly') label = k + ' 2026';
-      else if (S.period === 'yearly') label = k;
-      else label = monthLabel(k);
-
-      rowData.push({ label: label, lpR: lpR, lpC: lpC, vR: vR, vC: vC, rmR: rmR, rmC: rmC, totalCost: totalCost, cleanRecs: cleanRecs, blended: blended, campCount: campCount, campList: campList });
-    }
-
-    function wowBadge(curr, prev) {
-      if (!prev || prev === 0) return '';
-      var pct = ((curr - prev) / prev) * 100;
-      if (Math.abs(pct) < 0.5) return '';
-      var arrow = pct > 0 ? '&#x25B2;' : '&#x25BC;';
-      var color = pct > 0 ? '#2e7d32' : '#c62828';
-      return ' <span style="font-size:9px;color:' + color + '">' + arrow + Math.abs(pct).toFixed(1) + '%</span>';
-    }
-    function wowBadgeInv(curr, prev) {
-      // Inverted: lower is better (cost, blended)
-      if (!prev || prev === 0) return '';
-      var pct = ((curr - prev) / prev) * 100;
-      if (Math.abs(pct) < 0.5) return '';
-      var arrow = pct > 0 ? '&#x25B2;' : '&#x25BC;';
-      var color = pct < 0 ? '#2e7d32' : '#c62828';
-      return ' <span style="font-size:9px;color:' + color + '">' + arrow + Math.abs(pct).toFixed(1) + '%</span>';
-    }
-
-    var html = '<table class="tbl"><thead><tr><th>Period</th><th class="col-lp">LP Recs</th><th class="col-lp">LP Cost</th><th class="col-v">V Recs</th><th class="col-v">V Cost</th><th class="col-rm">RM Scrubbed</th><th class="col-rm">RM Cost</th><th class="col-sum">Clean Recs</th><th class="col-sum">Total Cost</th><th class="col-sum">Blended $/Rec</th><th class="col-sum">vs Target</th><th>Camps</th></tr></thead><tbody>';
-    for (var i = 0; i < rowData.length; i++) {
-      var r = rowData[i];
-      var prev = i < rowData.length - 1 ? rowData[i + 1] : null; // keys are reverse-sorted, so i+1 is the prior period
-      var d = '<span class="muted">—</span>';
-      html += '<tr><td><strong>' + r.label + '</strong></td>';
-      html += '<td class="lp-cell" style="text-align:right">' + (r.lpR > 0 ? r.lpR.toLocaleString() + wowBadge(r.lpR, prev ? prev.lpR : 0) : d) + '</td>';
-      html += '<td class="lp-cell" style="text-align:right">' + (r.lpC > 0 ? fmt(r.lpC) + wowBadgeInv(r.lpC, prev ? prev.lpC : 0) : d) + '</td>';
-      html += '<td class="v-cell" style="text-align:right">' + (r.vR > 0 ? r.vR.toLocaleString() + wowBadge(r.vR, prev ? prev.vR : 0) : d) + '</td>';
-      html += '<td class="v-cell" style="text-align:right">' + (r.vC > 0 ? fmt(r.vC) + wowBadgeInv(r.vC, prev ? prev.vC : 0) : d) + '</td>';
-      html += '<td class="rm-cell" style="text-align:right">' + (r.rmR > 0 ? r.rmR.toLocaleString() + wowBadgeInv(r.rmR, prev ? prev.rmR : 0) : d) + '</td>';
-      html += '<td class="rm-cell" style="text-align:right">' + (r.rmC > 0 ? fmt(r.rmC) + wowBadgeInv(r.rmC, prev ? prev.rmC : 0) : d) + '</td>';
-      html += '<td class="sum-cell" style="text-align:right">' + (r.cleanRecs > 0 ? r.cleanRecs.toLocaleString() + wowBadge(r.cleanRecs, prev ? prev.cleanRecs : 0) : d) + '</td>';
-      html += '<td class="sum-cell" style="text-align:right">' + (r.totalCost > 0 ? fmt(r.totalCost) + wowBadgeInv(r.totalCost, prev ? prev.totalCost : 0) : d) + '</td>';
-      html += '<td class="sum-cell" style="text-align:right">' + (r.blended > 0 ? fmtBlended(r.blended) + wowBadgeInv(r.blended, prev ? prev.blended : 0) : d) + '</td>';
-      // % from benchmark
-      var vsTarget = '';
-      if (r.blended > 0) {
-        var pctFromTarget = ((r.blended - BLENDED_TARGET) / BLENDED_TARGET) * 100;
-        var cls = r.blended <= BLENDED_WARN ? 'bm-good' : r.blended <= BLENDED_TARGET ? 'bm-warn' : 'bm-bad';
-        if (pctFromTarget <= 0) {
-          vsTarget = '<span class="' + cls + '">' + Math.abs(pctFromTarget).toFixed(1) + '% under</span>';
-        } else {
-          vsTarget = '<span class="' + cls + '">' + pctFromTarget.toFixed(1) + '% over</span>';
-        }
-      } else { vsTarget = d; }
-      html += '<td class="sum-cell" style="text-align:center">' + vsTarget + '</td>';
-      html += '<td style="cursor:pointer;color:#0f3d2e;text-decoration:underline" onclick="var el=document.getElementById(\'camp-detail-'+i+'\');if(el)el.style.display=el.style.display===\'none\'?\'table-row\':\'none\'">' + r.campCount + '</td></tr>';
-      html += '<tr id="camp-detail-' + i + '" style="display:none"><td colspan="12" style="padding:6px 12px;background:#f4f8f5;border-top:none"><div style="display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11px">';
-      for (var ci = 0; ci < r.campList.length; ci++) { var cc = r.campList[ci]; html += '<span style="white-space:nowrap"><strong>' + cc.name.replace(/'/g,"&#39;") + '</strong> <span class="muted">(' + cc.recs.toLocaleString() + ' recs)</span></span>'; }
-      html += '</div></td></tr>';
-    }
-    html += '</tbody></table>';
-    container.innerHTML = html;
-  }
-
-  renderRecordsTrend(groups);
-  renderSpendTrend(groups);
-}
-
 function renderRecordsTrend(groups) {
   destroyChart('recTrend');
   var ctx = $('recordsTrendChart');
   if (!ctx) return;
   var keys = Object.keys(groups).sort();
-  var labels = keys.map(function(k) {
-    if (S.period === 'daily') return k.substring(5);
-    if (S.period === 'weekly') return 'W/O ' + k.substring(5);
-    if (S.period === 'quarterly') return k;
-    if (S.period === 'yearly') return k;
-    return k;
-  });
+  var labels = keys.map(function(k) { return k; });
   CK.recTrend = new Chart(ctx, {
     type: 'line', data: {
       labels: labels, datasets: [
@@ -1500,13 +1337,7 @@ function renderSpendTrend(groups) {
   var ctx = $('spendVsRecordsChart');
   if (!ctx) return;
   var keys = Object.keys(groups).sort();
-  var labels = keys.map(function(k) {
-    if (S.period === 'daily') return k.substring(5);
-    if (S.period === 'weekly') return 'W/O ' + k.substring(5);
-    if (S.period === 'quarterly') return k;
-    if (S.period === 'yearly') return k;
-    return k;
-  });
+  var labels = keys.map(function(k) { return k; });
   CK.svr = new Chart(ctx, {
     type: 'bar', data: {
       labels: labels,
@@ -2102,6 +1933,10 @@ function renderOverview() {
       });
     }
   }
+  // Render trend charts (moved from Consolidation)
+  var trendGroups = consolidate('monthly', '', '');
+  renderRecordsTrend(trendGroups);
+  renderSpendTrend(trendGroups);
 }
 
 // ============================================================
@@ -2115,7 +1950,6 @@ function switchTab(name, btn) {
   $('tab-'+name).classList.add('active');
   btn.classList.add('active');
   setTimeout(function() {
-    if (name === 'consolidation') renderConsolidation();
     if (name === 'campaigns') renderCampaignView();
     if (name === 'costs') renderPlatformChart();
     if (name === 'overview') renderOverview();
