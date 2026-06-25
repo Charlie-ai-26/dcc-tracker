@@ -1619,10 +1619,6 @@ function renderEffChart(platTotalRecs, lpCost, vCost, rmCost, combinedCost, tota
   if (platTotalRecs['Readymode'] > 0 && rmCost > 0)
     effData.push({ name: 'RM (Scrubbed)', cpr: rmCost / platTotalRecs['Readymode'], color: '#e8913a' });
 
-  var cleanRecs = totalLP - (platTotalRecs['Readymode'] || 0);
-  if (cleanRecs > 0 && combinedCost > 0)
-    effData.push({ name: 'Blended', cpr: combinedCost / cleanRecs, color: '#d4a843' });
-
   if (effData.length === 0) { ctx.parentElement.innerHTML = '<p class="empty">Add records and costs to see $/record</p>'; return; }
 
   CK.eff = new Chart(ctx, {
@@ -1991,3 +1987,4 @@ load(function() {
 </script>
 </body>
 </html>
+                                                                                                                                                                                                 
