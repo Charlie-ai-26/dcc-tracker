@@ -1710,7 +1710,8 @@ function renderCreditsTable() {
   body.innerHTML = html;
 }
 
-function renderCreditGauge(months) {
+function renderCreditGauge(months, ovFrom, ovTo) {
+  var useRange = ovFrom || ovTo;
   var container = document.getElementById('credit-gauge-container');
   if (!container) return;
 
@@ -1719,19 +1720,27 @@ function renderCreditGauge(months) {
   var hasAnyVCr = false;
   for (var i = 0; i < S.daily.length; i++) {
     var eMo = S.daily[i].bm || getMonthKey(S.daily[i].date);
-    if (months.indexOf(eMo) >= 0) {
-      usedCredits += getEntryVCredits(S.daily[i]);
-      if (S.daily[i].vCr != null) hasAnyVCr = true;
+    if (months.indexOf(eMo) < 0) continue;
+    if (useRange) {
+      if (ovFrom && S.daily[i].date < ovFrom) continue;
+      if (ovTo && S.daily[i].date > ovTo) continue;
     }
+    usedCredits += getEntryVCredits(S.daily[i]);
+    if (S.daily[i].vCr != null) hasAnyVCr = true;
   }
   // If we have actual_credits_used for this quarter and no entries have vCr, use the actual
   var qKey = new Date().getFullYear() + '-' + S.quarter;
   var actualQ = getActualCreditsUsed(qKey);
-  if (actualQ > 0 && !hasAnyVCr) usedCredits = actualQ;
+  if (actualQ > 0 && !hasAnyVCr && !useRange) usedCredits = actualQ;
 
   var cap = 0;
   for (var ci = 0; ci < S.credits.length; ci++) {
     if (S.credits[ci].quarter === qKey) { cap = S.credits[ci].credits; break; }
+  }
+  var fullCap = cap;
+  var quarterMonthCount = qMonths(S.quarter).length || 3;
+  if (useRange && months.length < quarterMonthCount) {
+    cap = Math.round(fullCap * (months.length / quarterMonthCount));
   }
   if (cap <= 0) { container.innerHTML = ''; return; }
   var pct = cap > 0 ? (usedCredits / cap) * 100 : 0;
@@ -1761,7 +1770,7 @@ function renderCreditGauge(months) {
   var statusColor = pct > 100 ? '#c62828' : pct > 90 ? '#d84315' : pct > 70 ? '#e8913a' : '#2e7d32';
 
   container.innerHTML = '<div class="credit-gauge">' +
-    '<h3>Versium Credit Utilization <span class="subtitle-tag">' + S.quarter + ' 2026</span> ' +
+    '<h3>Versium Credit Utilization <span class="subtitle-tag">' + (useRange ? 'Custom Range (prorated from ' + S.quarter + ')' : S.quarter + ' 2026') + '</span> ' +
     '<span style="margin-left:auto;font-size:10px;font-weight:600;color:' + statusColor + '">' + statusText + '</span></h3>' +
     '<div class="gauge-track">' +
       '<div class="gauge-fill" style="width:' + Math.min(pct, 100) + '%;background:' + barColor + '">' +
@@ -1775,7 +1784,7 @@ function renderCreditGauge(months) {
       '<span>' + (cap / 1000000).toFixed(1) + 'M</span>' +
     '</div>' +
     '<div class="gauge-stats">' +
-      '<div class="gauge-stat"><div class="gs-label">Used</div><div class="gs-value">' + (usedCredits / 1000).toFixed(0) + 'K</div><div class="gs-sub">of ' + (cap / 1000000).toFixed(1) + 'M</div></div>' +
+      '<div class="gauge-stat"><div class="gs-label">Used</div><div class="gs-value">' + (usedCredits / 1000).toFixed(0) + 'K</div><div class="gs-sub">of ' + (cap >= 1000000 ? (cap / 1000000).toFixed(1) + 'M' : (cap / 1000).toFixed(0) + 'K') + (useRange ? ' prorated' : '') + '</div></div>' +
       '<div class="gauge-stat"><div class="gs-label">Remaining</div><div class="gs-value">' + (remaining / 1000).toFixed(0) + 'K</div><div class="gs-sub">credits left</div></div>' +
       '<div class="gauge-stat"><div class="gs-label">Burn Rate</div><div class="gs-value">' + (burnRate / 1000).toFixed(0) + 'K</div><div class="gs-sub">/month avg</div></div>' +
       '<div class="gauge-stat"><div class="gs-label">$/Credit</div><div class="gs-value">$' + (creditRate > 0 ? creditRate.toFixed(4) : '—') + '</div><div class="gs-sub">fixed rate</div></div>' +
@@ -1905,23 +1914,25 @@ function renderOverview() {
     '<div class="kpi-card"><div class="kpi-label">Blended $/Record <span style="font-size:9px;color:#888">(target: $' + BLENDED_TARGET.toFixed(2) + ')</span></div><div class="kpi-value ' + blendedClass(blendedCpr) + '">' + (blendedCpr > 0 ? blendedDot(blendedCpr) + '$' + blendedCpr.toFixed(4) : '—') + '</div><div class="kpi-sub">' + (cleanRecs > 0 ? fmtK(cleanRecs) + ' clean records' : 'No data') + '</div></div>' +
     '<div class="kpi-card" style="cursor:pointer" onclick="var el=document.getElementById(\'overview-camp-expand\');if(el)el.style.display=el.style.display===\'none\'?\'block\':\'none\'"><div class="kpi-label">Campaigns <span style=\"font-size:9px;color:#888\">(click to expand)</span></div><div class="kpi-value">' + (campCount || DATA_CAMPAIGNS.length) + '</div><div class="kpi-sub">' + (campCount > 0 ? 'With recorded data' : 'From Command Center') + '</div></div>';
   var oldOvExp = document.getElementById('overview-camp-expand'); if (oldOvExp) oldOvExp.remove();
-  var ovHtml = '<div id="overview-camp-expand" style="display:none;background:#f4f8f5;border-radius:6px;padding:10px 14px;margin-bottom:12px;border:1px solid #e0e0e0"><div style="font-size:11px;font-weight:600;color:#0f3d2e;margin-bottom:6px">Campaigns in ' + S.quarter + ' (' + overviewCampList.length + ')</div><div style="display:flex;flex-wrap:wrap;gap:3px 14px;font-size:11px">';
+  var ovHtml = '<div id="overview-camp-expand" style="display:none;background:#f4f8f5;border-radius:6px;padding:10px 14px;margin-bottom:12px;border:1px solid #e0e0e0"><div style="font-size:11px;font-weight:600;color:#0f3d2e;margin-bottom:6px">Campaigns in ' + rangeTitle + ' (' + overviewCampList.length + ')</div><div style="display:flex;flex-wrap:wrap;gap:3px 14px;font-size:11px">';
   for (var ci = 0; ci < overviewCampList.length; ci++) { ovHtml += '<span style="white-space:nowrap"><strong>' + overviewCampList[ci].name.replace(/'/g,"&#39;") + '</strong> <span class="muted">(' + overviewCampList[ci].recs.toLocaleString() + ' clean)</span></span>'; }
   ovHtml += '</div></div>';
   $('kpis').insertAdjacentHTML('afterend', ovHtml);
 
   // Credit utilization gauge
-  renderCreditGauge(months);
+  renderCreditGauge(months, ovFrom, ovTo);
 
   // Spend chart
   destroyChart('spend');
   var ctx1 = $('spendChart');
   if (ctx1) {
-    var allMonths = {};
-    for (var i = 0; i < S.costs.length; i++) { allMonths[S.costs[i].month] = true; }
-    var mKeys = Object.keys(allMonths).sort();
+    var mKeys = months.slice().sort();
     var mSpend = {};
-    for (var i = 0; i < S.costs.length; i++) { mSpend[S.costs[i].month] = (mSpend[S.costs[i].month]||0) + S.costs[i].amt; }
+    for (var i = 0; i < S.costs.length; i++) {
+      if (months.indexOf(S.costs[i].month) >= 0) {
+        mSpend[S.costs[i].month] = (mSpend[S.costs[i].month]||0) + S.costs[i].amt;
+      }
+    }
 
     CK.spend = new Chart(ctx1, {
       type: 'bar', data: { labels: mKeys.map(monthLabel), datasets: [{ data: mKeys.map(function(m) { return mSpend[m]||0; }), backgroundColor: '#0f3d2e88', borderColor: '#0f3d2e', borderWidth: 1, borderRadius: 3 }] },
@@ -1942,7 +1953,7 @@ function renderOverview() {
     }
   }
   // Render trend charts (moved from Consolidation)
-  var trendGroups = consolidate('monthly', '', '');
+  var trendGroups = consolidate('monthly', ovFrom || '', ovTo || '');
   renderRecordsTrend(trendGroups);
   renderSpendTrend(trendGroups);
 }
