@@ -1824,6 +1824,14 @@ function renderOverview() {
     }
     for (var i = 0; i < S.costs.length; i++) { allMonths[S.costs[i].month] = true; }
     months = Object.keys(allMonths).sort();
+    // Filter months to only those overlapping with the custom date range
+    var fromMonth = ovFrom ? getMonthKey(ovFrom) : '';
+    var toMonth = ovTo ? getMonthKey(ovTo) : '';
+    months = months.filter(function(m) {
+      if (fromMonth && m < fromMonth) return false;
+      if (toMonth && m > toMonth) return false;
+      return true;
+    });
     rangeTitle = 'Custom Range';
   } else {
     months = qMonths(S.quarter);
