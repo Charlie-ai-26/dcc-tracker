@@ -1720,7 +1720,8 @@ function renderCampaignView() {
   $('camp-count').insertAdjacentHTML('afterend', crHtml);
 
   renderCPRChart(campPlatRecs, platTotalRecs, lpCostTotal, vCostTotal, rmCostTotal);
-  renderEffChart(platTotalRecs, lpCostTotal, vCostTotal, rmCostTotal, combinedCost, totalLP, totalRM);
+  var campVRate = useRange && mDaily.length > 0 ? getVCreditRate(mDaily[0].bm || getMonthKey(mDaily[0].date)) : getVCreditRate(selMonth);
+  renderEffChart(platTotalRecs, lpCostTotal, vCostTotal, rmCostTotal, combinedCost, totalLP, totalRM, campVRate);
 
   // Dynamically populate month selector from available data (by billing month)
   var monthsUsed = {};
@@ -1774,7 +1775,7 @@ function renderCPRChart(campPlatRecs, platTotalRecs, lpCostTotal, vCostTotal, rm
   });
 }
 
-function renderEffChart(platTotalRecs, lpCost, vCost, rmCost, combinedCost, totalLP, totalRM) {
+function renderEffChart(platTotalRecs, lpCost, vCost, rmCost, combinedCost, totalLP, totalRM, vCreditRate) {
   destroyChart('eff');
   var ctx = $('effChart');
   if (!ctx) return;
@@ -1783,7 +1784,7 @@ function renderEffChart(platTotalRecs, lpCost, vCost, rmCost, combinedCost, tota
   if (platTotalRecs['Land Portal'] > 0 && lpCost > 0)
     effData.push({ name: 'Land Portal', cpr: lpCost / platTotalRecs['Land Portal'], color: '#1a5c44' });
   if (platTotalRecs['Versium'] > 0 && vCost > 0)
-    effData.push({ name: 'Versium', cpr: (useRange && mDaily.length > 0 ? getVCreditRate(mDaily[0].bm || getMonthKey(mDaily[0].date)) : getVCreditRate(selMonth)), color: '#0f3d2e' });
+    effData.push({ name: 'Versium', cpr: vCreditRate || (vCost / platTotalRecs['Versium']), color: '#0f3d2e' });
   if (platTotalRecs['Readymode'] > 0 && rmCost > 0)
     effData.push({ name: 'RM (Scrubbed)', cpr: rmCost / platTotalRecs['Readymode'], color: '#e8913a' });
 
