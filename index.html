@@ -265,7 +265,8 @@ h3 { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; }
           </select>
         </div>
         <div class="fg" style="max-width:110px"><label>LP Records</label><input type="number" id="d-lp" placeholder="0"></div>
-        <div class="fg" style="max-width:110px"><label>Versium Records</label><input type="number" id="d-v" placeholder="0"></div>
+        <div class="fg" style="max-width:110px"><label>V Contact Pts</label><input type="number" id="d-v" placeholder="0"></div>
+        <div class="fg" style="max-width:120px"><label>V Credits <span style="font-weight:400;text-transform:none">(match)</span></label><input type="number" id="d-vcr" placeholder="From Versium"></div>
         <div class="fg" style="max-width:110px"><label>Clean Records</label><input type="number" id="d-rm" placeholder="0"></div>
         <div class="fg" style="max-width:120px"><label>RM Scrubbed <span style="font-weight:400;text-transform:none">(opt)</span></label><input type="number" id="d-rmscrub" placeholder="Auto"></div>
         <div class="fg" style="max-width:130px"><label>Entered By</label><input type="text" id="d-by" placeholder="Your name"></div>
@@ -347,6 +348,29 @@ h3 { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; }
       <table class="tbl">
         <thead><tr><th>Month</th><th>Platform</th><th>Amount</th><th></th></tr></thead>
         <tbody id="cost-body"></tbody>
+      </table>
+    </div>
+    <div class="card mt">
+      <h3>Versium Quarterly Credits</h3>
+      <p class="muted mb">Set credit allotment and actual credits consumed per quarter. The $/credit rate uses allotment; cost calculations use actual credits consumed.</p>
+      <div class="form-row">
+        <div class="fg" style="max-width:140px"><label>Quarter</label>
+          <select id="vc-quarter">
+            <option value="2026-Q1">Q1 2026</option>
+            <option value="2026-Q2" selected>Q2 2026</option>
+            <option value="2026-Q3">Q3 2026</option>
+            <option value="2026-Q4">Q4 2026</option>
+            <option value="2027-Q1">Q1 2027</option>
+            <option value="2027-Q2">Q2 2027</option>
+          </select>
+        </div>
+        <div class="fg" style="max-width:140px"><label>Credit Allotment</label><input type="number" id="vc-credits" placeholder="e.g. 1500000"></div>
+        <div class="fg" style="max-width:140px"><label>Actual Used</label><input type="number" id="vc-actual" placeholder="From Versium"></div>
+        <button class="btn btn-p" onclick="saveCredits()">Save</button>
+      </div>
+      <table class="tbl mt">
+        <thead><tr><th>Quarter</th><th>Allotment</th><th>Actual Used</th><th>$/Credit</th><th></th></tr></thead>
+        <tbody id="credits-body"></tbody>
       </table>
     </div>
     <div class="card mt">
@@ -590,14 +614,56 @@ var sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 // ============================================================
 // STATE
 // ============================================================
-var S = { daily: [], costs: [], quarter: 'Q2', period: 'monthly' };
+var S = { daily: [], costs: [], credits: [], quarter: 'Q2', period: 'monthly' };
 var isAdmin = false;
 var BLENDED_TARGET = 0.05; // $0.05 per clean record
-var V_QUARTERLY_CREDITS = 1500000; // 1.5M Versium credits per quarter
+function getQuarterForMonth(month) {
+  var m = parseInt(month.substring(5,7));
+  var y = month.substring(0,4);
+  var q = m <= 3 ? 'Q1' : m <= 6 ? 'Q2' : m <= 9 ? 'Q3' : 'Q4';
+  return y + '-' + q;
+}
+function getQuarterlyCredits(month) {
+  var qKey = getQuarterForMonth(month);
+  for (var i = 0; i < S.credits.length; i++) {
+    if (S.credits[i].quarter === qKey) return S.credits[i].credits;
+  }
+  return 0;
+}
+function getActualCreditsUsed(qKey) {
+  for (var i = 0; i < S.credits.length; i++) {
+    if (S.credits[i].quarter === qKey) return S.credits[i].actual || 0;
+  }
+  return 0;
+}
 function getVCreditRate(month) {
   var vCost = getCostForMonth(month, 'Versium');
   if (vCost <= 0) return 0;
-  return (vCost * 3) / V_QUARTERLY_CREDITS; // quarterly cost / 1.5M
+  var qCredits = getQuarterlyCredits(month);
+  if (qCredits <= 0) return 0;
+  return (vCost * 3) / qCredits;
+}
+function getEntryVCredits(e) {
+  // If entry has explicit v_credits, use it; otherwise estimate from quarterly actual
+  if (e.vCr != null && e.vCr >= 0) return e.vCr;
+  // Proportional estimate: (entry V recs / quarter total V recs) * actual credits used
+  var qKey = getQuarterForMonth(e.bm || getMonthKey(e.date));
+  var actualUsed = getActualCreditsUsed(qKey);
+  if (actualUsed <= 0 || (e.v || 0) <= 0) return 0;
+  // Get quarter total V recs for all entries in this quarter
+  var qMonths = [];
+  var y = qKey.substring(0,4), qn = qKey.substring(5);
+  if (qn === 'Q1') qMonths = [y+'-01',y+'-02',y+'-03'];
+  else if (qn === 'Q2') qMonths = [y+'-04',y+'-05',y+'-06'];
+  else if (qn === 'Q3') qMonths = [y+'-07',y+'-08',y+'-09'];
+  else qMonths = [y+'-10',y+'-11',y+'-12'];
+  var totalVRecs = 0;
+  for (var j = 0; j < S.daily.length; j++) {
+    var em = S.daily[j].bm || getMonthKey(S.daily[j].date);
+    if (qMonths.indexOf(em) >= 0) totalVRecs += (S.daily[j].v || 0);
+  }
+  if (totalVRecs <= 0) return 0;
+  return Math.round((e.v / totalVRecs) * actualUsed);
 }
 var BLENDED_WARN = 0.04;   // yellow threshold
 var CK = {};
@@ -605,7 +671,7 @@ var CK = {};
 // Load data from Supabase
 function load(callback) {
   var done = 0;
-  var total = 2;
+  var total = 3;
   var errors = [];
   function check() {
     done++;
@@ -625,7 +691,7 @@ function load(callback) {
       S.daily = [];
       for (var i = 0; i < res.data.length; i++) {
         var r = res.data[i];
-        S.daily.push({ id: r.id, date: r.entry_date, camp: r.campaign, bm: r.billing_month || r.entry_date.substring(0,7), lp: r.lp_records || 0, v: r.v_records || 0, rm: r.rm_records || 0, rmOv: r.rm_scrubbed_override != null ? r.rm_scrubbed_override : null, by: r.entered_by || '', notes: r.notes || '' });
+        S.daily.push({ id: r.id, date: r.entry_date, camp: r.campaign, bm: r.billing_month || r.entry_date.substring(0,7), lp: r.lp_records || 0, v: r.v_records || 0, rm: r.rm_records || 0, rmOv: r.rm_scrubbed_override != null ? r.rm_scrubbed_override : null, vCr: r.v_credits != null ? r.v_credits : null, by: r.entered_by || '', notes: r.notes || '' });
       }
     }
     check();
@@ -642,6 +708,18 @@ function load(callback) {
     }
     check();
   }).catch(function(err) { errors.push('Costs fetch failed: ' + err.message); check(); });
+
+  sb.from('dcc_quarterly_credits').select('*').order('quarter', {ascending: true}).then(function(res) {
+    if (res.error) { errors.push('Credits: ' + res.error.message); }
+    else if (res.data) {
+      S.credits = [];
+      for (var i = 0; i < res.data.length; i++) {
+        var r = res.data[i];
+        S.credits.push({ id: r.id, quarter: r.quarter, credits: parseInt(r.credits), actual: r.actual_credits_used != null ? parseInt(r.actual_credits_used) : null });
+      }
+    }
+    check();
+  }).catch(function(err) { errors.push('Credits fetch failed: ' + err.message); check(); });
 }
 
 // ============================================================
@@ -870,46 +948,31 @@ function consolidate(period, fromDate, toDate) {
     }
   }
 
-  // Override Versium cost: use fixed credit rate instead of proportional allocation
+  // Override Versium cost: sum actual credits per entry × credit rate
+  // Build a map of group key → total v credits for entries in that group
   var gKeys = Object.keys(groups);
   for (var gi = 0; gi < gKeys.length; gi++) {
     var gk = gKeys[gi];
     var g = groups[gk];
-    var vRecs = (g.byPlat && g.byPlat['Versium']) || 0;
-    if (vRecs > 0) {
-      // Determine billing month(s) for this group's entries to get correct rate
-      var vCreditCost = 0;
-      // For monthly/quarterly/yearly, find which months contribute and use their rates
-      if (period === 'monthly') {
-        vCreditCost = vRecs * getVCreditRate(gk);
-      } else if (period === 'quarterly') {
-        // Use first month of quarter for rate (all same subscription)
-        var qMonths = [];
-        for (var mi = 0; mi < S.costs.length; mi++) {
-          if (S.costs[mi].plat === 'Versium') {
-            var qm = parseInt(S.costs[mi].month.substring(5,7));
-            var q = qm <= 3 ? 'Q1' : qm <= 6 ? 'Q2' : qm <= 9 ? 'Q3' : 'Q4';
-            if (q === gk && qMonths.indexOf(S.costs[mi].month) < 0) qMonths.push(S.costs[mi].month);
-          }
-        }
-        vCreditCost = vRecs * (qMonths.length > 0 ? getVCreditRate(qMonths[0]) : 0);
-      } else if (period === 'yearly') {
-        var yMonths = [];
-        for (var mi = 0; mi < S.costs.length; mi++) {
-          if (S.costs[mi].plat === 'Versium' && S.costs[mi].month.substring(0,4) === gk && yMonths.indexOf(S.costs[mi].month) < 0)
-            yMonths.push(S.costs[mi].month);
-        }
-        vCreditCost = vRecs * (yMonths.length > 0 ? getVCreditRate(yMonths[0]) : 0);
-      } else {
-        // daily or weekly: find which billing month this group's entries belong to
-        var entryMonth = null;
-        for (var ei = 0; ei < filtered.length; ei++) {
-          var ek = period === 'daily' ? filtered[ei].date : getWeekKey(filtered[ei].date);
-          if (ek === gk) { entryMonth = filtered[ei].bm || getMonthKey(filtered[ei].date); break; }
-        }
-        vCreditCost = entryMonth ? vRecs * getVCreditRate(entryMonth) : 0;
+    // Sum getEntryVCredits for entries belonging to this group
+    var groupVCredits = 0;
+    var groupVRate = 0;
+    for (var ei = 0; ei < filtered.length; ei++) {
+      var ek;
+      if (period === 'daily') ek = filtered[ei].date;
+      else if (period === 'weekly') ek = getWeekKey(filtered[ei].date);
+      else if (period === 'monthly') ek = filtered[ei].bm || getMonthKey(filtered[ei].date);
+      else if (period === 'quarterly') { var qm2 = parseInt((filtered[ei].bm || getMonthKey(filtered[ei].date)).substring(5,7)); ek = qm2 <= 3 ? 'Q1' : qm2 <= 6 ? 'Q2' : qm2 <= 9 ? 'Q3' : 'Q4'; }
+      else ek = (filtered[ei].bm || getMonthKey(filtered[ei].date)).substring(0,4);
+      if (ek === gk) {
+        groupVCredits += getEntryVCredits(filtered[ei]);
+        if (groupVRate === 0) groupVRate = getVCreditRate(filtered[ei].bm || getMonthKey(filtered[ei].date));
       }
-      g.costByPlat['Versium'] = vCreditCost;
+    }
+    if (groupVCredits > 0 && groupVRate > 0) {
+      g.costByPlat['Versium'] = groupVCredits * groupVRate;
+    } else if ((g.byPlat && g.byPlat['Versium']) || 0 > 0) {
+      g.costByPlat['Versium'] = 0;
     }
   }
 
@@ -922,6 +985,7 @@ function consolidate(period, fromDate, toDate) {
 function renderAll() {
   renderDailyTable();
   renderCostTable();
+  renderCreditsTable();
   renderCreditsTable();
   renderPlatformChart();
   renderConsolidation();
@@ -970,6 +1034,7 @@ function addDaily() {
   var v = parseInt($('d-v').value) || 0;
   var clean = parseInt($('d-rm').value) || 0;
   var rmScrubOv = $('d-rmscrub').value.trim() !== '' ? parseInt($('d-rmscrub').value) : null;
+  var vCredits = $('d-vcr').value.trim() !== '' ? parseInt($('d-vcr').value) : null;
   var by = $('d-by').value.trim();
   var notes = $('d-notes').value;
   if (!date || !camp) return alert('Enter date and campaign.');
@@ -977,13 +1042,13 @@ function addDaily() {
   if (!by) return alert('Enter your name in the "Entered By" field.');
 
   sb.from('dcc_daily_entries').insert({
-    entry_date: date, campaign: camp, billing_month: bm, lp_records: lp, v_records: v, rm_records: clean, rm_scrubbed_override: rmScrubOv, entered_by: by, notes: notes
+    entry_date: date, campaign: camp, billing_month: bm, lp_records: lp, v_records: v, rm_records: clean, rm_scrubbed_override: rmScrubOv, v_credits: vCredits, entered_by: by, notes: notes
   }).select().then(function(res) {
     if (res.error) return alert('Error saving: ' + res.error.message);
     var r = res.data[0];
-    S.daily.unshift({ id: r.id, date: r.entry_date, camp: r.campaign, bm: r.billing_month, lp: r.lp_records, v: r.v_records, rm: r.rm_records, rmOv: r.rm_scrubbed_override != null ? r.rm_scrubbed_override : null, by: r.entered_by, notes: r.notes || '' });
+    S.daily.unshift({ id: r.id, date: r.entry_date, camp: r.campaign, bm: r.billing_month, lp: r.lp_records, v: r.v_records, rm: r.rm_records, rmOv: r.rm_scrubbed_override != null ? r.rm_scrubbed_override : null, vCr: r.v_credits != null ? r.v_credits : null, by: r.entered_by, notes: r.notes || '' });
     try { localStorage.setItem('landai_dcc_lastby', by); } catch(e){}
-    $('d-lp').value = ''; $('d-v').value = ''; $('d-rm').value = ''; $('d-rmscrub').value = '';
+    $('d-lp').value = ''; $('d-v').value = ''; $('d-rm').value = ''; $('d-rmscrub').value = ''; $('d-vcr').value = '';
     $('d-notes').value = '';
     renderAll();
   });
@@ -1009,6 +1074,8 @@ function editDaily(id) {
   row.cells[3].innerHTML = '<input type="number" class="edit-input" id="de-lp-' + id + '" value="' + (entry.lp||0) + '">';
   row.cells[6].innerHTML = '<input type="number" class="edit-input" id="de-v-' + id + '" value="' + (entry.v||0) + '">';
   row.cells[9].innerHTML = '<input type="number" class="edit-input" id="de-rmscrub-' + id + '" value="' + (entry.rmOv != null ? entry.rmOv : '') + '" placeholder="Auto" style="width:70px">';
+  // V Credits edit: inject after V recs (cells[6] already has V recs edit)
+  row.cells[7].innerHTML = '<input type="number" class="edit-input" id="de-vcr-' + id + '" value="' + (entry.vCr != null ? entry.vCr : '') + '" placeholder="Est." style="width:60px">';
   row.cells[12].innerHTML = '<input type="number" class="edit-input" id="de-clean-' + id + '" value="' + (entry.rm||0) + '">';
   row.cells[16].innerHTML = '<button class="btn-save" onclick="saveDailyEdit(' + id + ')">Save</button> <button class="btn-cancel" onclick="renderDailyTable()">Cancel</button>';
   var inputs = [document.getElementById('de-lp-'+id), document.getElementById('de-v-'+id), document.getElementById('de-rmscrub-'+id), document.getElementById('de-clean-'+id)];
@@ -1027,10 +1094,12 @@ function saveDailyEdit(id) {
   var v = parseInt(vEl.value) || 0;
   var cl = parseInt(clEl.value) || 0;
   var rmOv = (rmScrubEl && rmScrubEl.value.trim() !== '') ? parseInt(rmScrubEl.value) : null;
-  sb.from('dcc_daily_entries').update({ lp_records: lp, v_records: v, rm_records: cl, rm_scrubbed_override: rmOv }).eq('id', id).then(function(res) {
+  var vCrEl = document.getElementById('de-vcr-' + id);
+  var vCr = (vCrEl && vCrEl.value.trim() !== '') ? parseInt(vCrEl.value) : null;
+  sb.from('dcc_daily_entries').update({ lp_records: lp, v_records: v, rm_records: cl, rm_scrubbed_override: rmOv, v_credits: vCr }).eq('id', id).then(function(res) {
     if (res.error) return alert('Error: ' + res.error.message);
     for (var i = 0; i < S.daily.length; i++) {
-      if (S.daily[i].id === id) { S.daily[i].lp = lp; S.daily[i].v = v; S.daily[i].rm = cl; S.daily[i].rmOv = rmOv; break; }
+      if (S.daily[i].id === id) { S.daily[i].lp = lp; S.daily[i].v = v; S.daily[i].rm = cl; S.daily[i].rmOv = rmOv; S.daily[i].vCr = vCr; break; }
     }
     renderAll();
   });
@@ -1080,13 +1149,14 @@ function renderDailyTable() {
     // Per-platform monthly $/rec
     var lpRate = (mt.lp > 0 && lpCost > 0) ? lpCost / mt.lp : 0;
     var vRate = getVCreditRate(mk);
+    var eVCredits = getEntryVCredits(e);
     var rmRate = (mt.rm > 0 && rmCost > 0) ? rmCost / mt.rm : 0;
 
     // e.rm stores clean records; scrubbed = override or LP - clean
     var eLp = e.lp || 0, eV = e.v || 0, eClean = e.rm || 0;
     var eScrub = getScrub(e);
     var lpAlloc = (mt.lp > 0 && eLp > 0) ? (eLp / mt.lp) * lpCost : 0;
-    var vAlloc = (eV > 0 && vRate > 0) ? eV * vRate : 0;
+    var vAlloc = (eVCredits > 0 && vRate > 0) ? eVCredits * vRate : 0;
     var rmAlloc = (mt.rm > 0 && eScrub > 0) ? (eScrub / mt.rm) * rmCost : 0;
     var totalCost = lpAlloc + vAlloc + rmAlloc;
     var cleanRecs = eClean;
@@ -1462,7 +1532,12 @@ function renderCampaignView() {
 
     // Allocated costs
     var lpAlloc = (platTotalRecs['Land Portal'] > 0 && lpR > 0) ? (lpR / platTotalRecs['Land Portal']) * lpCostTotal : 0;
-    var vAlloc = (vR > 0 && vCpr > 0) ? vR * vCpr : 0;
+    // Sum v credits for this campaign's entries
+    var campVCredits = 0;
+    for (var ce = 0; ce < mDaily.length; ce++) {
+      if (mDaily[ce].camp === name) campVCredits += getEntryVCredits(mDaily[ce]);
+    }
+    var vAlloc = (campVCredits > 0 && vCpr > 0) ? campVCredits * vCpr : 0;
     var rmAlloc = (platTotalRecs['Readymode'] > 0 && rmR > 0) ? (rmR / platTotalRecs['Readymode']) * rmCostTotal : 0;
     var totalCost = lpAlloc + vAlloc + rmAlloc;
 
@@ -1654,20 +1729,93 @@ function setQ(q) {
   renderOverview();
 }
 
+// --- VERSIUM CREDITS MANAGEMENT ---
+function saveCredits() {
+  var quarter = document.getElementById('vc-quarter').value;
+  var credits = parseInt(document.getElementById('vc-credits').value);
+  var actual = document.getElementById('vc-actual').value.trim() !== '' ? parseInt(document.getElementById('vc-actual').value) : null;
+  if (!quarter || isNaN(credits) || credits <= 0) { alert('Enter a valid quarter and credit allotment.'); return; }
+  var existing = null;
+  for (var i = 0; i < S.credits.length; i++) { if (S.credits[i].quarter === quarter) { existing = S.credits[i]; break; } }
+  if (existing) {
+    var upd = { credits: credits };
+    if (actual !== null) upd.actual_credits_used = actual;
+    sb.from('dcc_quarterly_credits').update(upd).eq('id', existing.id).then(function(res) {
+      if (res.error) { alert('Error: ' + res.error.message); return; }
+      existing.credits = credits;
+      if (actual !== null) existing.actual = actual;
+      renderCreditsTable(); renderAll();
+    });
+  } else {
+    var ins = { quarter: quarter, credits: credits };
+    if (actual !== null) ins.actual_credits_used = actual;
+    sb.from('dcc_quarterly_credits').insert(ins).select().then(function(res) {
+      if (res.error) { alert('Error: ' + res.error.message); return; }
+      if (res.data && res.data[0]) {
+        S.credits.push({ id: res.data[0].id, quarter: res.data[0].quarter, credits: parseInt(res.data[0].credits), actual: res.data[0].actual_credits_used != null ? parseInt(res.data[0].actual_credits_used) : null });
+        S.credits.sort(function(a,b) { return a.quarter.localeCompare(b.quarter); });
+      }
+      document.getElementById('vc-credits').value = '';
+      document.getElementById('vc-actual').value = '';
+      renderCreditsTable(); renderAll();
+    });
+  }
+}
+function deleteCredits(id) {
+  if (!confirm('Delete this credit allotment?')) return;
+  sb.from('dcc_quarterly_credits').delete().eq('id', id).then(function(res) {
+    if (res.error) { alert('Error: ' + res.error.message); return; }
+    S.credits = S.credits.filter(function(c) { return c.id !== id; });
+    renderCreditsTable(); renderAll();
+  });
+}
+function renderCreditsTable() {
+  var body = document.getElementById('credits-body');
+  if (!body) return;
+  var html = '';
+  for (var i = 0; i < S.credits.length; i++) {
+    var c = S.credits[i];
+    var qMonths = [];
+    var y = c.quarter.substring(0,4), qn = c.quarter.substring(5);
+    if (qn === 'Q1') qMonths = [y+'-01',y+'-02',y+'-03'];
+    else if (qn === 'Q2') qMonths = [y+'-04',y+'-05',y+'-06'];
+    else if (qn === 'Q3') qMonths = [y+'-07',y+'-08',y+'-09'];
+    else qMonths = [y+'-10',y+'-11',y+'-12'];
+    var rate = 0;
+    for (var m = 0; m < qMonths.length; m++) { rate = getVCreditRate(qMonths[m]); if (rate > 0) break; }
+    html += '<tr><td><span class="badge b-teal">' + c.quarter + '</span></td>';
+    html += '<td>' + c.credits.toLocaleString() + '</td>';
+    html += '<td><strong>' + (c.actual != null ? c.actual.toLocaleString() : '<span class="muted">Not set</span>') + '</strong></td>';
+    html += '<td>' + (rate > 0 ? '$' + rate.toFixed(4) : '<span class="muted">—</span>') + '</td>';
+    html += '<td>' + (isAdmin ? '<button class="btn-x" onclick="deleteCredits(' + c.id + ')">x</button>' : '') + '</td></tr>';
+  }
+  body.innerHTML = html;
+}
+
 function renderCreditGauge(months) {
   var container = document.getElementById('credit-gauge-container');
   if (!container) return;
 
-  // Sum V records for selected quarter months
+  // Sum actual credits: use v_credits if available, otherwise estimate
   var usedCredits = 0;
+  var hasAnyVCr = false;
   for (var i = 0; i < S.daily.length; i++) {
-    var eMo = getMonthKey(S.daily[i].date);
+    var eMo = S.daily[i].bm || getMonthKey(S.daily[i].date);
     if (months.indexOf(eMo) >= 0) {
-      usedCredits += (S.daily[i].v || 0);
+      usedCredits += getEntryVCredits(S.daily[i]);
+      if (S.daily[i].vCr != null) hasAnyVCr = true;
     }
   }
+  // If we have actual_credits_used for this quarter and no entries have vCr, use the actual
+  var qKey = new Date().getFullYear() + '-' + S.quarter;
+  var actualQ = getActualCreditsUsed(qKey);
+  if (actualQ > 0 && !hasAnyVCr) usedCredits = actualQ;
 
-  var cap = V_QUARTERLY_CREDITS;
+  var cap = 0;
+  for (var ci = 0; ci < S.credits.length; ci++) {
+    if (S.credits[ci].quarter === qKey) { cap = S.credits[ci].credits; break; }
+  }
+  if (cap <= 0) { container.innerHTML = ''; return; }
   var pct = cap > 0 ? (usedCredits / cap) * 100 : 0;
   var remaining = Math.max(0, cap - usedCredits);
   var monthsElapsed = 0;
