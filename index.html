@@ -2040,6 +2040,9 @@ function renderOverview() {
   var lpR = platRecs['Land Portal'] || 0;
   var vR = platRecs['Versium'] || 0;
   var rmR = platRecs['Readymode'] || 0;
+  // Sum actual credits (not raw contact points) for Versium KPI
+  var vCreditsTotal = 0;
+  for (var vc = 0; vc < qDaily.length; vc++) { vCreditsTotal += getEntryVCredits(qDaily[vc]); }
   var lpS = platSpend['Land Portal'] || 0;
   var vS = platSpend['Versium'] || 0;
   var rmS = platSpend['Readymode'] || 0;
@@ -2058,7 +2061,7 @@ function renderOverview() {
   $('kpis').innerHTML =
     '<div class="kpi-card"><div class="kpi-label">Total Spend (' + rangeTitle + ')</div><div class="kpi-value">' + fmt(totalSpend) + '</div><div class="kpi-sub">All platforms combined</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">Land Portal</div><div class="kpi-value">' + (lpR > 0 ? fmtK(lpR) + ' recs' : '—') + '</div><div class="kpi-sub">' + (lpCpr > 0 ? '$' + lpCpr.toFixed(4) + '/rec | ' + fmt(lpS) : 'No cost data') + '</div></div>' +
-    '<div class="kpi-card"><div class="kpi-label">Versium <span style="font-size:8px;color:#999">credit-based</span></div><div class="kpi-value">' + (vR > 0 ? fmtK(vR) + ' credits' : '—') + '</div><div class="kpi-sub">' + (vCpr > 0 ? '$' + vCpr.toFixed(4) + '/credit | ' + fmt(vS) + ' subscription' : 'No cost data') + '</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">Versium <span style="font-size:8px;color:#999">credit-based</span></div><div class="kpi-value">' + (vCreditsTotal > 0 ? fmtK(vCreditsTotal) + ' credits' : '—') + '</div><div class="kpi-sub">' + (vCpr > 0 ? '$' + vCpr.toFixed(4) + '/credit | ' + fmt(vCreditsTotal * vCpr) + ' allocated' : 'No cost data') + '</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">Readymode (Scrubbed off)</div><div class="kpi-value">' + (rmR > 0 ? fmtK(rmR) + ' recs' : '—') + '</div><div class="kpi-sub">' + (rmCpr > 0 ? '$' + rmCpr.toFixed(4) + '/rec | ' + fmt(rmS) : 'No cost data') + '</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">Blended $/Record <span style="font-size:9px;color:#888">(target: $' + BLENDED_TARGET.toFixed(2) + ')</span></div><div class="kpi-value ' + blendedClass(blendedCpr) + '">' + (blendedCpr > 0 ? blendedDot(blendedCpr) + '$' + blendedCpr.toFixed(4) : '—') + '</div><div class="kpi-sub">' + (cleanRecs > 0 ? fmtK(cleanRecs) + ' clean records' : 'No data') + '</div></div>' +
     '<div class="kpi-card" style="cursor:pointer" onclick="var el=document.getElementById(\'overview-camp-expand\');if(el)el.style.display=el.style.display===\'none\'?\'block\':\'none\'"><div class="kpi-label">Campaigns <span style=\"font-size:9px;color:#888\">(click to expand)</span></div><div class="kpi-value">' + (campCount || DATA_CAMPAIGNS.length) + '</div><div class="kpi-sub">' + (campCount > 0 ? 'With recorded data' : 'From Command Center') + '</div></div>';
