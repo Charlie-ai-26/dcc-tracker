@@ -1956,4 +1956,23 @@ function switchTab(name, btn) {
   setTimeout(function() {
     if (name === 'campaigns') renderCampaignView();
     if (name === 'costs') renderPlatformChart();
-    if (name === 'overview') rende
+    if (name === 'overview') renderOverview();
+  }, 50);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+load(function() {
+  var el = document.getElementById('load-status');
+  if (el && S.daily.length > 0) {
+    el.textContent = 'Connected — ' + S.daily.length + ' entries, ' + S.costs.length + ' cost records loaded';
+    el.style.color = '#2e7d32';
+  } else if (el && S.daily.length === 0 && S.costs.length === 0) {
+    el.textContent = 'Connected — no data found. Add entries above.';
+  }
+  renderAll();
+});
+</script>
+</body>
+</html>
