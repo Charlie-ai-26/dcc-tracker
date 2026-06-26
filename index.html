@@ -1675,12 +1675,15 @@ function renderCreditsTable() {
     for (var m = 0; m < qmList.length; m++) { rate = getVCreditRate(qmList[m]); if (rate > 0) break; }
     // Auto-calculate credits used from daily entries
     var usedFromEntries = 0;
+    var hasLoggedCr = false;
     for (var j = 0; j < S.daily.length; j++) {
       var em = S.daily[j].bm || getMonthKey(S.daily[j].date);
       if (qmList.indexOf(em) >= 0 && S.daily[j].vCr != null && S.daily[j].vCr > 0) {
-        usedFromEntries += S.daily[j].vCr;
+        usedFromEntries += S.daily[j].vCr; hasLoggedCr = true;
       }
     }
+    // Fallback to stored quarterly actual if no entries have credits logged
+    if (!hasLoggedCr && c.actual != null && c.actual > 0) usedFromEntries = c.actual;
     var pct = c.credits > 0 ? Math.round((usedFromEntries / c.credits) * 100) : 0;
     html += '<tr><td><span class="badge b-teal">' + c.quarter + '</span></td>';
     html += '<td>' + c.credits.toLocaleString() + '</td>';
@@ -1698,6 +1701,7 @@ function renderCreditGauge(months, ovFrom, ovTo) {
 
   // Sum credits used from daily entry logs
   var usedCredits = 0;
+  var hasAnyCr = false;
   for (var i = 0; i < S.daily.length; i++) {
     var eMo = S.daily[i].bm || getMonthKey(S.daily[i].date);
     if (months.indexOf(eMo) < 0) continue;
@@ -1705,9 +1709,14 @@ function renderCreditGauge(months, ovFrom, ovTo) {
       if (ovFrom && S.daily[i].date < ovFrom) continue;
       if (ovTo && S.daily[i].date > ovTo) continue;
     }
-    if (S.daily[i].vCr != null && S.daily[i].vCr > 0) usedCredits += S.daily[i].vCr;
+    if (S.daily[i].vCr != null && S.daily[i].vCr > 0) { usedCredits += S.daily[i].vCr; hasAnyCr = true; }
   }
   var qKey = new Date().getFullYear() + '-' + S.quarter;
+  // Fallback: use stored quarterly actual if no daily entries have credits logged yet
+  if (!hasAnyCr && !useRange) {
+    var fallback = getActualCreditsUsed(qKey);
+    if (fallback > 0) usedCredits = fallback;
+  }
 
   var cap = 0;
   for (var ci = 0; ci < S.credits.length; ci++) {
@@ -1885,7 +1894,7 @@ function renderOverview() {
   $('kpis').innerHTML =
     '<div class="kpi-card"><div class="kpi-label">Total Spend (' + rangeTitle + ')</div><div class="kpi-value">' + fmt(totalSpend) + '</div><div class="kpi-sub">All platforms combined</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">Land Portal</div><div class="kpi-value">' + (lpR > 0 ? fmtK(lpR) + ' recs' : '—') + '</div><div class="kpi-sub">' + (lpCpr > 0 ? '$' + lpCpr.toFixed(4) + '/rec | ' + fmt(lpS) : 'No cost data') + '</div></div>' +
-    '<div class="kpi-card"><div class="kpi-label">Versium <span style="font-size:8px;color:#999">credit-based</span></div><div class="kpi-value">' + (vCreditsTotal > 0 ? fmtK(vCreditsTotal) + ' credits' : '—') + '</div><div class="kpi-sub">' + (vCpr > 0 ? '$' + vCpr.toFixed(4) + '/credit | ' + fmt(vCreditsTotal * vCpr) + ' allocated' : 'No cost data') + '</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">Versium <span style="font-size:8px;color:#999">credit-based</span></div><div class="kpi-value">' + (vCreditsTotal > 0 ? fmtK(vCreditsTotal) + ' credits' : (vR > 0 ? fmtK(vR) + ' recs' : '—')) + '</div><div class="kpi-sub">' + (vCpr > 0 && vCreditsTotal > 0 ? '$' + vCpr.toFixed(4) + '/credit | ' + fmt(vCreditsTotal * vCpr) + ' allocated' : (vCpr > 0 && vR > 0 ? '$' + vCpr.toFixed(4) + '/credit | ' + fmt(vS) : 'No cost data')) + '</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">Readymode (Scrubbed off)</div><div class="kpi-value">' + (rmR > 0 ? fmtK(rmR) + ' recs' : '—') + '</div><div class="kpi-sub">' + (rmCpr > 0 ? '$' + rmCpr.toFixed(4) + '/rec | ' + fmt(rmS) : 'No cost data') + '</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">Blended $/Record <span style="font-size:9px;color:#888">(target: $' + BLENDED_TARGET.toFixed(2) + ')</span></div><div class="kpi-value ' + blendedClass(blendedCpr) + '">' + (blendedCpr > 0 ? blendedDot(blendedCpr) + '$' + blendedCpr.toFixed(4) : '—') + '</div><div class="kpi-sub">' + (cleanRecs > 0 ? fmtK(cleanRecs) + ' clean records' : 'No data') + '</div></div>' +
     '<div class="kpi-card" style="cursor:pointer" onclick="var el=document.getElementById(\'overview-camp-expand\');if(el)el.style.display=el.style.display===\'none\'?\'block\':\'none\'"><div class="kpi-label">Campaigns <span style=\"font-size:9px;color:#888\">(click to expand)</span></div><div class="kpi-value">' + (campCount || DATA_CAMPAIGNS.length) + '</div><div class="kpi-sub">' + (campCount > 0 ? 'With recorded data' : 'From Command Center') + '</div></div>';
@@ -1947,23 +1956,4 @@ function switchTab(name, btn) {
   setTimeout(function() {
     if (name === 'campaigns') renderCampaignView();
     if (name === 'costs') renderPlatformChart();
-    if (name === 'overview') renderOverview();
-  }, 50);
-}
-
-// ============================================================
-// INIT
-// ============================================================
-load(function() {
-  var el = document.getElementById('load-status');
-  if (el && S.daily.length > 0) {
-    el.textContent = 'Connected — ' + S.daily.length + ' entries, ' + S.costs.length + ' cost records loaded';
-    el.style.color = '#2e7d32';
-  } else if (el && S.daily.length === 0 && S.costs.length === 0) {
-    el.textContent = 'Connected — no data found. Add entries above.';
-  }
-  renderAll();
-});
-</script>
-</body>
-</html>
+    if (name === 'overview') rende
