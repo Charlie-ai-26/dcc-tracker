@@ -1748,7 +1748,7 @@ function renderCreditGauge(months, ovFrom, ovTo) {
   var statusColor = pct > 100 ? '#c62828' : pct > 90 ? '#d84315' : pct > 70 ? '#e8913a' : '#2e7d32';
 
   container.innerHTML = '<div class="credit-gauge">' +
-    '<h3>Credit Utilization <span class="subtitle-tag">' + (useRange ? 'Custom Range (prorated from ' + S.quarter + ')' : S.quarter + ' 2026') + '</span> ' +
+    '<h3>Credit Utilization <span style="font-size:11px;font-weight:500;color:#5a907c;margin-left:6px">Versium</span> <span class="subtitle-tag">' + (useRange ? 'Custom Range (prorated from ' + S.quarter + ')' : S.quarter + ' 2026') + '</span> ' +
     '<span style="margin-left:auto;font-size:10px;font-weight:600;color:' + statusColor + '">' + statusText + '</span></h3>' +
     '<div class="gauge-track">' +
       '<div class="gauge-fill" style="width:' + Math.min(pct, 100) + '%;background:' + barColor + '">' +
