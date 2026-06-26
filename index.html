@@ -1673,17 +1673,15 @@ function renderCreditsTable() {
     else qmList = [y+'-10',y+'-11',y+'-12'];
     var rate = 0;
     for (var m = 0; m < qmList.length; m++) { rate = getVCreditRate(qmList[m]); if (rate > 0) break; }
-    // Auto-calculate credits used from daily entries
-    var usedFromEntries = 0;
-    var hasLoggedCr = false;
+    // Credits used = baseline (actual_credits_used) + new daily entry credits
+    var entryCr = 0;
     for (var j = 0; j < S.daily.length; j++) {
       var em = S.daily[j].bm || getMonthKey(S.daily[j].date);
       if (qmList.indexOf(em) >= 0 && S.daily[j].vCr != null && S.daily[j].vCr > 0) {
-        usedFromEntries += S.daily[j].vCr; hasLoggedCr = true;
+        entryCr += S.daily[j].vCr;
       }
     }
-    // Fallback to stored quarterly actual if no entries have credits logged
-    if (!hasLoggedCr && c.actual != null && c.actual > 0) usedFromEntries = c.actual;
+    var usedFromEntries = (c.actual || 0) + entryCr;
     var pct = c.credits > 0 ? Math.round((usedFromEntries / c.credits) * 100) : 0;
     html += '<tr><td><span class="badge b-teal">' + c.quarter + '</span></td>';
     html += '<td>' + c.credits.toLocaleString() + '</td>';
@@ -1699,9 +1697,8 @@ function renderCreditGauge(months, ovFrom, ovTo) {
   var container = document.getElementById('credit-gauge-container');
   if (!container) return;
 
-  // Sum credits used from daily entry logs
-  var usedCredits = 0;
-  var hasAnyCr = false;
+  // Credits used = baseline (actual_credits_used) + new daily entry credits
+  var entryCreds = 0;
   for (var i = 0; i < S.daily.length; i++) {
     var eMo = S.daily[i].bm || getMonthKey(S.daily[i].date);
     if (months.indexOf(eMo) < 0) continue;
@@ -1709,14 +1706,10 @@ function renderCreditGauge(months, ovFrom, ovTo) {
       if (ovFrom && S.daily[i].date < ovFrom) continue;
       if (ovTo && S.daily[i].date > ovTo) continue;
     }
-    if (S.daily[i].vCr != null && S.daily[i].vCr > 0) { usedCredits += S.daily[i].vCr; hasAnyCr = true; }
+    if (S.daily[i].vCr != null && S.daily[i].vCr > 0) entryCreds += S.daily[i].vCr;
   }
   var qKey = new Date().getFullYear() + '-' + S.quarter;
-  // Fallback: use stored quarterly actual if no daily entries have credits logged yet
-  if (!hasAnyCr && !useRange) {
-    var fallback = getActualCreditsUsed(qKey);
-    if (fallback > 0) usedCredits = fallback;
-  }
+  var usedCredits = getActualCreditsUsed(qKey) + entryCreds;
 
   var cap = 0;
   for (var ci = 0; ci < S.credits.length; ci++) {
@@ -1873,9 +1866,12 @@ function renderOverview() {
   var lpR = platRecs['Land Portal'] || 0;
   var vR = platRecs['Versium'] || 0;
   var rmR = platRecs['Readymode'] || 0;
-  // Sum actual credits (not raw contact points) for Versium KPI
-  var vCreditsTotal = 0;
-  for (var vc = 0; vc < qDaily.length; vc++) { vCreditsTotal += getEntryVCredits(qDaily[vc]); }
+  // Sum actual credits: baseline from quarterly actual_credits_used + new daily entry credits
+  var vCreditsFromEntries = 0;
+  for (var vc = 0; vc < qDaily.length; vc++) { vCreditsFromEntries += getEntryVCredits(qDaily[vc]); }
+  var qKeyOv = new Date().getFullYear() + '-' + S.quarter;
+  var vCreditsBaseline = getActualCreditsUsed(qKeyOv);
+  var vCreditsTotal = vCreditsBaseline + vCreditsFromEntries;
   var lpS = platSpend['Land Portal'] || 0;
   var vS = platSpend['Versium'] || 0;
   var rmS = platSpend['Readymode'] || 0;
