@@ -348,8 +348,8 @@ h3 { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; }
       </table>
     </div>
     <div class="card mt">
-      <h3>Versium Quarterly Credits</h3>
-      <p class="muted mb">Set credit allotment and actual credits consumed per quarter. The $/credit rate uses allotment; cost calculations use actual credits consumed.</p>
+      <h3>Credit Usage</h3>
+      <p class="muted mb">Set the quarterly credit allotment. Credits used are auto-calculated from daily entry logs. The $/credit rate = (monthly platform cost × 3) ÷ allotment.</p>
       <div class="form-row">
         <div class="fg" style="max-width:140px"><label>Quarter</label>
           <select id="vc-quarter">
@@ -362,11 +362,10 @@ h3 { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; }
           </select>
         </div>
         <div class="fg" style="max-width:140px"><label>Credit Allotment</label><input type="number" id="vc-credits" placeholder="e.g. 1500000"></div>
-        <div class="fg" style="max-width:140px"><label>Actual Used</label><input type="number" id="vc-actual" placeholder="From Versium"></div>
         <button class="btn btn-p" onclick="saveCredits()">Save</button>
       </div>
       <table class="tbl mt">
-        <thead><tr><th>Quarter</th><th>Allotment</th><th>Actual Used</th><th>$/Credit</th><th></th></tr></thead>
+        <thead><tr><th>Quarter</th><th>Allotment</th><th>Credits Used</th><th>$/Credit</th><th></th></tr></thead>
         <tbody id="credits-body"></tbody>
       </table>
     </div>
@@ -633,26 +632,9 @@ function getVCreditRate(month) {
   return (vCost * 3) / qCredits;
 }
 function getEntryVCredits(e) {
-  // If entry has explicit v_credits, use it; otherwise estimate from quarterly actual
+  // Credits come directly from the daily entry log
   if (e.vCr != null && e.vCr >= 0) return e.vCr;
-  // Proportional estimate: (entry V recs / quarter total V recs) * actual credits used
-  var qKey = getQuarterForMonth(e.bm || getMonthKey(e.date));
-  var actualUsed = getActualCreditsUsed(qKey);
-  if (actualUsed <= 0 || (e.v || 0) <= 0) return 0;
-  // Get quarter total V recs for all entries in this quarter
-  var qMonths = [];
-  var y = qKey.substring(0,4), qn = qKey.substring(5);
-  if (qn === 'Q1') qMonths = [y+'-01',y+'-02',y+'-03'];
-  else if (qn === 'Q2') qMonths = [y+'-04',y+'-05',y+'-06'];
-  else if (qn === 'Q3') qMonths = [y+'-07',y+'-08',y+'-09'];
-  else qMonths = [y+'-10',y+'-11',y+'-12'];
-  var totalVRecs = 0;
-  for (var j = 0; j < S.daily.length; j++) {
-    var em = S.daily[j].bm || getMonthKey(S.daily[j].date);
-    if (qMonths.indexOf(em) >= 0) totalVRecs += (S.daily[j].v || 0);
-  }
-  if (totalVRecs <= 0) return 0;
-  return Math.round((e.v / totalVRecs) * actualUsed);
+  return 0;
 }
 var BLENDED_WARN = 0.04;   // yellow threshold
 var CK = {};
@@ -1644,34 +1626,27 @@ function setQ(q) {
   renderOverview();
 }
 
-// --- VERSIUM CREDITS MANAGEMENT ---
+// --- CREDIT USAGE MANAGEMENT ---
 function saveCredits() {
   var quarter = document.getElementById('vc-quarter').value;
   var credits = parseInt(document.getElementById('vc-credits').value);
-  var actual = document.getElementById('vc-actual').value.trim() !== '' ? parseInt(document.getElementById('vc-actual').value) : null;
   if (!quarter || isNaN(credits) || credits <= 0) { alert('Enter a valid quarter and credit allotment.'); return; }
   var existing = null;
   for (var i = 0; i < S.credits.length; i++) { if (S.credits[i].quarter === quarter) { existing = S.credits[i]; break; } }
   if (existing) {
-    var upd = { credits: credits };
-    if (actual !== null) upd.actual_credits_used = actual;
-    sb.from('dcc_quarterly_credits').update(upd).eq('id', existing.id).then(function(res) {
+    sb.from('dcc_quarterly_credits').update({ credits: credits }).eq('id', existing.id).then(function(res) {
       if (res.error) { alert('Error: ' + res.error.message); return; }
       existing.credits = credits;
-      if (actual !== null) existing.actual = actual;
       renderCreditsTable(); renderAll();
     });
   } else {
-    var ins = { quarter: quarter, credits: credits };
-    if (actual !== null) ins.actual_credits_used = actual;
-    sb.from('dcc_quarterly_credits').insert(ins).select().then(function(res) {
+    sb.from('dcc_quarterly_credits').insert({ quarter: quarter, credits: credits }).select().then(function(res) {
       if (res.error) { alert('Error: ' + res.error.message); return; }
       if (res.data && res.data[0]) {
-        S.credits.push({ id: res.data[0].id, quarter: res.data[0].quarter, credits: parseInt(res.data[0].credits), actual: res.data[0].actual_credits_used != null ? parseInt(res.data[0].actual_credits_used) : null });
+        S.credits.push({ id: res.data[0].id, quarter: res.data[0].quarter, credits: parseInt(res.data[0].credits) });
         S.credits.sort(function(a,b) { return a.quarter.localeCompare(b.quarter); });
       }
       document.getElementById('vc-credits').value = '';
-      document.getElementById('vc-actual').value = '';
       renderCreditsTable(); renderAll();
     });
   }
@@ -1690,17 +1665,26 @@ function renderCreditsTable() {
   var html = '';
   for (var i = 0; i < S.credits.length; i++) {
     var c = S.credits[i];
-    var qMonths = [];
+    var qmList = [];
     var y = c.quarter.substring(0,4), qn = c.quarter.substring(5);
-    if (qn === 'Q1') qMonths = [y+'-01',y+'-02',y+'-03'];
-    else if (qn === 'Q2') qMonths = [y+'-04',y+'-05',y+'-06'];
-    else if (qn === 'Q3') qMonths = [y+'-07',y+'-08',y+'-09'];
-    else qMonths = [y+'-10',y+'-11',y+'-12'];
+    if (qn === 'Q1') qmList = [y+'-01',y+'-02',y+'-03'];
+    else if (qn === 'Q2') qmList = [y+'-04',y+'-05',y+'-06'];
+    else if (qn === 'Q3') qmList = [y+'-07',y+'-08',y+'-09'];
+    else qmList = [y+'-10',y+'-11',y+'-12'];
     var rate = 0;
-    for (var m = 0; m < qMonths.length; m++) { rate = getVCreditRate(qMonths[m]); if (rate > 0) break; }
+    for (var m = 0; m < qmList.length; m++) { rate = getVCreditRate(qmList[m]); if (rate > 0) break; }
+    // Auto-calculate credits used from daily entries
+    var usedFromEntries = 0;
+    for (var j = 0; j < S.daily.length; j++) {
+      var em = S.daily[j].bm || getMonthKey(S.daily[j].date);
+      if (qmList.indexOf(em) >= 0 && S.daily[j].vCr != null && S.daily[j].vCr > 0) {
+        usedFromEntries += S.daily[j].vCr;
+      }
+    }
+    var pct = c.credits > 0 ? Math.round((usedFromEntries / c.credits) * 100) : 0;
     html += '<tr><td><span class="badge b-teal">' + c.quarter + '</span></td>';
     html += '<td>' + c.credits.toLocaleString() + '</td>';
-    html += '<td><strong>' + (c.actual != null ? c.actual.toLocaleString() : '<span class="muted">Not set</span>') + '</strong></td>';
+    html += '<td><strong>' + usedFromEntries.toLocaleString() + '</strong> <span class="muted">(' + pct + '%)</span></td>';
     html += '<td>' + (rate > 0 ? '$' + rate.toFixed(4) : '<span class="muted">—</span>') + '</td>';
     html += '<td>' + (isAdmin ? '<button class="btn-x" onclick="deleteCredits(' + c.id + ')">x</button>' : '') + '</td></tr>';
   }
@@ -1712,9 +1696,8 @@ function renderCreditGauge(months, ovFrom, ovTo) {
   var container = document.getElementById('credit-gauge-container');
   if (!container) return;
 
-  // Sum actual credits: use v_credits if available, otherwise estimate
+  // Sum credits used from daily entry logs
   var usedCredits = 0;
-  var hasAnyVCr = false;
   for (var i = 0; i < S.daily.length; i++) {
     var eMo = S.daily[i].bm || getMonthKey(S.daily[i].date);
     if (months.indexOf(eMo) < 0) continue;
@@ -1722,13 +1705,9 @@ function renderCreditGauge(months, ovFrom, ovTo) {
       if (ovFrom && S.daily[i].date < ovFrom) continue;
       if (ovTo && S.daily[i].date > ovTo) continue;
     }
-    usedCredits += getEntryVCredits(S.daily[i]);
-    if (S.daily[i].vCr != null) hasAnyVCr = true;
+    if (S.daily[i].vCr != null && S.daily[i].vCr > 0) usedCredits += S.daily[i].vCr;
   }
-  // If we have actual_credits_used for this quarter and no entries have vCr, use the actual
   var qKey = new Date().getFullYear() + '-' + S.quarter;
-  var actualQ = getActualCreditsUsed(qKey);
-  if (actualQ > 0 && !hasAnyVCr && !useRange) usedCredits = actualQ;
 
   var cap = 0;
   for (var ci = 0; ci < S.credits.length; ci++) {
@@ -1767,7 +1746,7 @@ function renderCreditGauge(months, ovFrom, ovTo) {
   var statusColor = pct > 100 ? '#c62828' : pct > 90 ? '#d84315' : pct > 70 ? '#e8913a' : '#2e7d32';
 
   container.innerHTML = '<div class="credit-gauge">' +
-    '<h3>Versium Credit Utilization <span class="subtitle-tag">' + (useRange ? 'Custom Range (prorated from ' + S.quarter + ')' : S.quarter + ' 2026') + '</span> ' +
+    '<h3>Credit Utilization <span class="subtitle-tag">' + (useRange ? 'Custom Range (prorated from ' + S.quarter + ')' : S.quarter + ' 2026') + '</span> ' +
     '<span style="margin-left:auto;font-size:10px;font-weight:600;color:' + statusColor + '">' + statusText + '</span></h3>' +
     '<div class="gauge-track">' +
       '<div class="gauge-fill" style="width:' + Math.min(pct, 100) + '%;background:' + barColor + '">' +
@@ -1988,4 +1967,3 @@ load(function() {
 </script>
 </body>
 </html>
-                                                                                                                      
