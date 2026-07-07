@@ -1710,7 +1710,7 @@ function renderCreditGauge(months, ovFrom, ovTo) {
     if (S.daily[i].vCr != null && S.daily[i].vCr > 0) entryCreds += S.daily[i].vCr;
   }
   var qKey = new Date().getFullYear() + '-' + S.quarter;
-  var usedCredits = getActualCreditsUsed(qKey) + entryCreds;
+  var usedCredits = (useRange ? 0 : getActualCreditsUsed(qKey)) + entryCreds;
 
   var cap = 0;
   for (var ci = 0; ci < S.credits.length; ci++) {
@@ -1825,14 +1825,29 @@ function renderOverview() {
     months = qMonths(S.quarter);
   }
 
-  // Costs for the period
+  // Costs for the period (prorate for sub-month custom ranges)
   var platSpend = {};
   var totalSpend = 0;
   for (var i = 0; i < S.costs.length; i++) {
     var c = S.costs[i];
     if (months.indexOf(c.month) >= 0) {
-      platSpend[c.plat] = (platSpend[c.plat]||0) + c.amt;
-      totalSpend += c.amt;
+      var amt = c.amt;
+      if (useRange) {
+        // Prorate: what fraction of this cost month overlaps the custom range?
+        var mParts = c.month.split('-');
+        var mYear = parseInt(mParts[0]), mMon = parseInt(mParts[1]);
+        var daysInMonth = new Date(mYear, mMon, 0).getDate();
+        var mStart = c.month + '-01';
+        var mEnd = c.month + '-' + (daysInMonth < 10 ? '0' : '') + daysInMonth;
+        var oStart = (ovFrom && ovFrom > mStart) ? ovFrom : mStart;
+        var oEnd = (ovTo && ovTo < mEnd) ? ovTo : mEnd;
+        if (oStart <= oEnd) {
+          var overlapDays = Math.round((new Date(oEnd) - new Date(oStart)) / 86400000) + 1;
+          amt = c.amt * (overlapDays / daysInMonth);
+        }
+      }
+      platSpend[c.plat] = (platSpend[c.plat]||0) + amt;
+      totalSpend += amt;
     }
   }
 
@@ -1871,7 +1886,7 @@ function renderOverview() {
   var vCreditsFromEntries = 0;
   for (var vc = 0; vc < qDaily.length; vc++) { vCreditsFromEntries += getEntryVCredits(qDaily[vc]); }
   var qKeyOv = new Date().getFullYear() + '-' + S.quarter;
-  var vCreditsBaseline = getActualCreditsUsed(qKeyOv);
+  var vCreditsBaseline = useRange ? 0 : getActualCreditsUsed(qKeyOv);
   var vCreditsTotal = vCreditsBaseline + vCreditsFromEntries;
   var lpS = platSpend['Land Portal'] || 0;
   var vS = platSpend['Versium'] || 0;
@@ -1886,6 +1901,7 @@ function renderOverview() {
   }
   var rmCpr = rmR > 0 && rmS > 0 ? rmS / rmR : 0;
   var cleanRecs = lpR - rmR;
+  if (cleanRecs < 0) cleanRecs = 0;
   var blendedCpr = cleanRecs > 0 && totalSpend > 0 ? totalSpend / cleanRecs : 0;
 
   $('kpis').innerHTML =
