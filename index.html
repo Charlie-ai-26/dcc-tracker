@@ -1221,7 +1221,27 @@ function addCost() {
     });
   } else {
     sb.from('dcc_platform_costs').insert({ month: month, platform: plat, amount: amt }).select().then(function(res) {
-      if (res.error) return alert('Error saving: ' + res.error.message);
+      if (res.error) {
+        // Handle duplicate key from entries added outside this session (e.g. Command Center)
+        if (res.error.message && res.error.message.indexOf('duplicate') !== -1) {
+          // Reload costs from DB then offer to update
+          sb.from('dcc_platform_costs').select('*').eq('month', month).eq('platform', plat).then(function(r2) {
+            if (r2.error || !r2.data || !r2.data.length) return alert('Entry already exists. Please refresh the page.');
+            var ext = r2.data[0];
+            S.costs.push({ id: ext.id, month: ext.month, plat: ext.platform, amt: parseFloat(ext.amount) });
+            if (confirm(plat + ' already has an entry for ' + monthLabel(month) + ' (' + fmt(parseFloat(ext.amount)) + ') added externally. Replace with ' + fmt(amt) + '?')) {
+              sb.from('dcc_platform_costs').update({ amount: amt }).eq('id', ext.id).select().then(function(r3) {
+                if (r3.error) return alert('Error updating: ' + r3.error.message);
+                for (var k = 0; k < S.costs.length; k++) { if (S.costs[k].id === ext.id) { S.costs[k].amt = amt; break; } }
+                $('c-amt').value = ''; renderAll();
+              });
+            } else { renderAll(); }
+          });
+        } else {
+          return alert('Error saving: ' + res.error.message);
+        }
+        return;
+      }
       var r = res.data[0];
       S.costs.push({ id: r.id, month: r.month, plat: r.platform, amt: parseFloat(r.amount) });
       $('c-amt').value = ''; renderAll();
