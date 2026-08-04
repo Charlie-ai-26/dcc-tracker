@@ -602,9 +602,10 @@ var sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 // ============================================================
 // STATE
 // ============================================================
-var S = { daily: [], costs: [], credits: [], quarter: 'Q2' };
+var S = { daily: [], costs: [], credits: [], pqls: {}, quarter: 'Q2' };
 var isAdmin = false;
-var BLENDED_TARGET = 0.05; // $0.05 per clean record
+var PQL_TARGET = 25; // $25 max per PQL
+var BLENDED_TARGET = 0.05; // kept for $/record reference
 function getQuarterForMonth(month) {
   var m = parseInt(month.substring(5,7));
   var y = month.substring(0,4);
@@ -636,13 +637,24 @@ function getEntryVCredits(e) {
   if (e.vCr != null && e.vCr >= 0) return e.vCr;
   return 0;
 }
-var BLENDED_WARN = 0.04;   // yellow threshold
+var PQL_WARN = 22; // $22 yellow threshold for $/PQL
+var BLENDED_WARN = 0.04;   // kept for $/record reference
+function pqlClass(val) {
+  if (val <= 0) return '';
+  if (val <= PQL_WARN) return 'bm-good';
+  if (val <= PQL_TARGET) return 'bm-warn';
+  return 'bm-bad';
+}
+function pqlDot(val) {
+  var cls = val <= PQL_WARN ? 'good' : val <= PQL_TARGET ? 'warn' : 'bad';
+  return '<span class="bm-dot ' + cls + '"></span>';
+}
 var CK = {};
 
 // Load data from Supabase
 function load(callback) {
   var done = 0;
-  var total = 3;
+  var total = 4;
   var errors = [];
   function check() {
     done++;
@@ -679,6 +691,19 @@ function load(callback) {
     }
     check();
   }).catch(function(err) { errors.push('Costs fetch failed: ' + err.message); check(); });
+
+
+  // Fetch PQL counts
+  sb.from('dcc_monthly_pqls').select('*').then(function(res) {
+    if (res.error) { errors.push('PQLs: ' + res.error.message); }
+    else if (res.data) {
+      S.pqls = {};
+      for (var i = 0; i < res.data.length; i++) {
+        S.pqls[res.data[i].month] = res.data[i].pql_count;
+      }
+    }
+    check();
+  }).catch(function(err) { errors.push('PQLs fetch failed: ' + err.message); check(); });
 
   sb.from('dcc_quarterly_credits').select('*').order('quarter', {ascending: true}).then(function(res) {
     if (res.error) { errors.push('Credits: ' + res.error.message); }
@@ -1931,7 +1956,8 @@ function renderOverview() {
     '<div class="kpi-card"><div class="kpi-label">Land Portal</div><div class="kpi-value">' + (lpR > 0 ? fmtK(lpR) + ' recs' : '—') + '</div><div class="kpi-sub">' + (lpCpr > 0 ? '$' + lpCpr.toFixed(4) + '/rec | ' + fmt(lpS) : 'No cost data') + '</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">Versium <span style="font-size:8px;color:#999">credit-based</span></div><div class="kpi-value">' + (vCreditsTotal > 0 ? fmtK(vCreditsTotal) + ' credits' : (vR > 0 ? fmtK(vR) + ' recs' : '—')) + '</div><div class="kpi-sub">' + (vCpr > 0 && vCreditsTotal > 0 ? '$' + vCpr.toFixed(4) + '/credit | ' + fmt(vCreditsTotal * vCpr) + ' allocated' : (vCpr > 0 && vR > 0 ? '$' + vCpr.toFixed(4) + '/credit | ' + fmt(vS) : 'No cost data')) + '</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">Readymode (Scrubbed)</div><div class="kpi-value">' + (rmR > 0 ? fmtK(rmR) + ' recs' : '—') + '</div><div class="kpi-sub">' + (rmCpr > 0 ? '$' + rmCpr.toFixed(4) + '/rec | ' + fmt(rmS) : 'No cost data') + '</div></div>' +
-    '<div class="kpi-card"><div class="kpi-label">Blended $/Record <span style="font-size:9px;color:#888">(target: $' + BLENDED_TARGET.toFixed(2) + ')</span></div><div class="kpi-value ' + blendedClass(blendedCpr) + '">' + (blendedCpr > 0 ? blendedDot(blendedCpr) + '$' + blendedCpr.toFixed(4) : '—') + '</div><div class="kpi-sub">' + (cleanRecs > 0 ? fmtK(cleanRecs) + ' records loaded' : 'No data') + '</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">Blended $/Record</div><div class="kpi-value ' + blendedClass(blendedCpr) + '">' + (blendedCpr > 0 ? blendedDot(blendedCpr) + '$' + blendedCpr.toFixed(4) : '—') + '</div><div class="kpi-sub">' + (cleanRecs > 0 ? fmtK(cleanRecs) + ' records loaded' : 'No data') + '</div></div>' +
+    (function() { var pqlCount = 0; for (var pi = 0; pi < months.length; pi++) { pqlCount += (S.pqls[months[pi]] || 0); } var costPerPql = pqlCount > 0 && totalSpend > 0 ? totalSpend / pqlCount : 0; return '<div class="kpi-card"><div class="kpi-label">$/PQL <span style="font-size:9px;color:#888">(target: $' + PQL_WARN + '-$' + PQL_TARGET + ')</span></div><div class="kpi-value ' + pqlClass(costPerPql) + '">' + (costPerPql > 0 ? pqlDot(costPerPql) + '$' + costPerPql.toFixed(2) : '—') + '</div><div class="kpi-sub">' + (pqlCount > 0 ? pqlCount + ' PQLs produced' : 'No PQL data') + '</div></div>'; })() +
     '<div class="kpi-card" style="cursor:pointer" onclick="var el=document.getElementById(\'overview-camp-expand\');if(el)el.style.display=el.style.display===\'none\'?\'block\':\'none\'"><div class="kpi-label">Campaigns <span style=\"font-size:9px;color:#888\">(click to expand)</span></div><div class="kpi-value">' + (campCount || DATA_CAMPAIGNS.length) + '</div><div class="kpi-sub">' + (campCount > 0 ? 'With recorded data' : 'From Command Center') + '</div></div>';
   var oldOvExp = document.getElementById('overview-camp-expand'); if (oldOvExp) oldOvExp.remove();
   var ovHtml = '<div id="overview-camp-expand" style="display:none;background:#f4f8f5;border-radius:6px;padding:10px 14px;margin-bottom:12px;border:1px solid #e0e0e0"><div style="font-size:11px;font-weight:600;color:#0f3d2e;margin-bottom:6px">Campaigns in ' + rangeTitle + ' (' + overviewCampList.length + ')</div><div style="display:flex;flex-wrap:wrap;gap:3px 14px;font-size:11px">';
