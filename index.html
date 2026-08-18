@@ -102,7 +102,8 @@ h3 { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; }
 .gauge-fill { height: 100%; border-radius: 6px; transition: width 0.5s ease; position: relative; }
 .gauge-fill-inner { position: absolute; right: 6px; top: 1px; font-size: 9px; font-weight: 700; color: #fff; line-height: 16px; }
 .gauge-labels { display: flex; justify-content: space-between; font-size: 10px; color: #888; margin-top: 4px; }
-.gauge-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+.gauge-stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 10px; }
+@media(max-width:700px) { .gauge-stats { grid-template-columns: repeat(3, 1fr); } }
 .gauge-stat { text-align: center; }
 .gauge-stat .gs-label { font-size: 9px; text-transform: uppercase; color: #999; letter-spacing: 0.3px; }
 .gauge-stat .gs-value { font-size: 14px; font-weight: 700; color: #0f3d2e; }
@@ -1807,6 +1808,17 @@ function renderCreditGauge(months, ovFrom, ovTo) {
     if (creditRate > 0) break;
   }
 
+  // Effective rate and wasted spend
+  var qCost = 0;
+  for (var qi = 0; qi < months.length; qi++) {
+    for (var ci = 0; ci < S.costs.length; ci++) {
+      if (S.costs[ci].month === months[qi] && S.costs[ci].plat === 'Versium') qCost += S.costs[ci].amt;
+    }
+  }
+  var effectiveRate = usedCredits > 0 ? qCost / usedCredits : 0;
+  var wastedSpend = qCost - (usedCredits * creditRate);
+  var utilMultiple = creditRate > 0 && effectiveRate > 0 ? effectiveRate / creditRate : 0;
+
   // Color: green if on pace or under, yellow if 80-100%, red if over
   var barColor = pct <= 70 ? '#2e7d32' : pct <= 90 ? '#e8913a' : pct <= 100 ? '#d84315' : '#c62828';
   var statusText = pct > 100 ? 'OVER CAP' : pct > 90 ? 'Near cap' : pct > 70 ? 'Watch pace' : 'On track';
@@ -1830,7 +1842,9 @@ function renderCreditGauge(months, ovFrom, ovTo) {
       '<div class="gauge-stat"><div class="gs-label">Used</div><div class="gs-value">' + (usedCredits / 1000).toFixed(0) + 'K</div><div class="gs-sub">of ' + (cap >= 1000000 ? (cap / 1000000).toFixed(1) + 'M' : (cap / 1000).toFixed(0) + 'K') + (useRange ? ' prorated' : '') + '</div></div>' +
       '<div class="gauge-stat"><div class="gs-label">Remaining</div><div class="gs-value">' + (remaining / 1000).toFixed(0) + 'K</div><div class="gs-sub">credits left</div></div>' +
       '<div class="gauge-stat"><div class="gs-label">Burn Rate</div><div class="gs-value">' + (burnRate / 1000).toFixed(0) + 'K</div><div class="gs-sub">/month avg</div></div>' +
-      '<div class="gauge-stat"><div class="gs-label">$/Credit</div><div class="gs-value">$' + (creditRate > 0 ? creditRate.toFixed(4) : '—') + '</div><div class="gs-sub">fixed rate</div></div>' +
+      '<div class="gauge-stat"><div class="gs-label">Contract $/Cr</div><div class="gs-value">$' + (creditRate > 0 ? creditRate.toFixed(4) : '—') + '</div><div class="gs-sub">if 100% used</div></div>' +
+      '<div class="gauge-stat"><div class="gs-label">Effective $/Cr</div><div class="gs-value" style="color:' + (utilMultiple > 2 ? '#c62828' : utilMultiple > 1.5 ? '#e8913a' : '#2e7d32') + '">$' + (effectiveRate > 0 ? effectiveRate.toFixed(4) : '—') + '</div><div class="gs-sub">' + (utilMultiple > 0 ? utilMultiple.toFixed(1) + 'x contract' : '') + '</div></div>' +
+      '<div class="gauge-stat"><div class="gs-label">Unused Cost</div><div class="gs-value" style="color:' + (wastedSpend > 3000 ? '#c62828' : wastedSpend > 1000 ? '#e8913a' : '#2e7d32') + '">' + (wastedSpend > 0 ? '$' + (wastedSpend >= 1000 ? (wastedSpend / 1000).toFixed(1) + 'K' : wastedSpend.toFixed(0)) : '$0') + '</div><div class="gs-sub">paid, not used</div></div>' +
     '</div>' +
   '</div>';
 }
