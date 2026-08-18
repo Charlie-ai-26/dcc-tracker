@@ -604,11 +604,10 @@ var sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 // ============================================================
 // STATE
 // ============================================================
-var S = { daily: [], costs: [], credits: [], pqls: {}, quarter: 'Q3' };
+var S = { daily: [], costs: [], credits: [], quarter: 'Q3' };
 var isAdmin = false;
-var PQL_TARGET = 25; // $25 max per PQL
-var BLENDED_TARGET = 0.0485; // $25 / 515 recs-per-PQL
-var BLENDED_WARN = 0.0427;   // $22 / 515 recs-per-PQL
+var BLENDED_TARGET = 0.0485; // derived from $25/PQL ÷ 515 recs-per-PQL
+var BLENDED_WARN = 0.0427;   // derived from $22/PQL ÷ 515 recs-per-PQL
 function getQuarterForMonth(month) {
   var m = parseInt(month.substring(5,7));
   var y = month.substring(0,4);
@@ -640,23 +639,14 @@ function getEntryVCredits(e) {
   if (e.vCr != null && e.vCr >= 0) return e.vCr;
   return 0;
 }
-var PQL_WARN = 22; // $22 yellow threshold for $/PQL
-function pqlClass(val) {
-  if (val <= 0) return '';
-  if (val <= PQL_WARN) return 'bm-good';
-  if (val <= PQL_TARGET) return 'bm-warn';
-  return 'bm-bad';
-}
-function pqlDot(val) {
-  var cls = val <= PQL_WARN ? 'good' : val <= PQL_TARGET ? 'warn' : 'bad';
-  return '<span class="bm-dot ' + cls + '"></span>';
-}
+
+
 var CK = {};
 
 // Load data from Supabase
 function load(callback) {
   var done = 0;
-  var total = 4;
+  var total = 3;
   var errors = [];
   function check() {
     done++;
@@ -694,18 +684,6 @@ function load(callback) {
     check();
   }).catch(function(err) { errors.push('Costs fetch failed: ' + err.message); check(); });
 
-
-  // Fetch PQL counts
-  sb.from('dcc_monthly_pqls').select('*').then(function(res) {
-    if (res.error) { errors.push('PQLs: ' + res.error.message); }
-    else if (res.data) {
-      S.pqls = {};
-      for (var i = 0; i < res.data.length; i++) {
-        S.pqls[res.data[i].month] = res.data[i].pql_count;
-      }
-    }
-    check();
-  }).catch(function(err) { errors.push('PQLs fetch failed: ' + err.message); check(); });
 
   sb.from('dcc_quarterly_credits').select('*').order('quarter', {ascending: true}).then(function(res) {
     if (res.error) { errors.push('Credits: ' + res.error.message); }
