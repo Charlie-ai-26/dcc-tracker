@@ -607,6 +607,8 @@ var sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 var S = { daily: [], costs: [], credits: [], pqls: {}, quarter: 'Q3' };
 var isAdmin = false;
 var PQL_TARGET = 25; // $25 max per PQL
+var BLENDED_TARGET = 0.0485; // $25 / 515 recs-per-PQL
+var BLENDED_WARN = 0.0427;   // $22 / 515 recs-per-PQL
 function getQuarterForMonth(month) {
   var m = parseInt(month.substring(5,7));
   var y = month.substring(0,4);
@@ -750,34 +752,20 @@ function dateLabel(d) { return new Date(d+'T12:00:00').toLocaleDateString('en-US
 // ============================================================
 // BENCHMARK HELPERS
 // ============================================================
-function deriveRecordTargets(months) {
-  // Derive $/record thresholds from $/PQL targets using records-per-PQL ratio
-  var totalPqls = 0, totalRecs = 0;
-  for (var i = 0; i < months.length; i++) { totalPqls += (S.pqls[months[i]] || 0); }
-  for (var i = 0; i < S.daily.length; i++) {
-    var ek = S.daily[i].bm || getMonthKey(S.daily[i].date);
-    if (months.indexOf(ek) >= 0) totalRecs += (S.daily[i].rm || 0);
-  }
-  if (totalPqls <= 0 || totalRecs <= 0) return { warn: 0.04, target: 0.05, rpp: 0 };
-  var recsPerPql = totalRecs / totalPqls;
-  return { warn: PQL_WARN / recsPerPql, target: PQL_TARGET / recsPerPql, rpp: recsPerPql };
-}
-function blendedClass(val, tgt) {
-  var t = tgt || { warn: 0.04, target: 0.05 };
+function blendedClass(val) {
   if (val <= 0) return '';
-  if (val <= t.warn) return 'bm-good';
-  if (val <= t.target) return 'bm-warn';
+  if (val <= BLENDED_WARN) return 'bm-good';
+  if (val <= BLENDED_TARGET) return 'bm-warn';
   return 'bm-bad';
 }
-function blendedDot(val, tgt) {
-  var t = tgt || { warn: 0.04, target: 0.05 };
+function blendedDot(val) {
   if (val <= 0) return '';
-  var cls = val <= t.warn ? 'good' : val <= t.target ? 'warn' : 'bad';
+  var cls = val <= BLENDED_WARN ? 'good' : val <= BLENDED_TARGET ? 'warn' : 'bad';
   return '<span class="bm-dot ' + cls + '"></span>';
 }
-function fmtBlended(val, tgt) {
+function fmtBlended(val) {
   if (val <= 0) return '<span class="muted">—</span>';
-  return blendedDot(val, tgt) + '<span class="' + blendedClass(val, tgt) + '">$' + val.toFixed(4) + '</span>';
+  return blendedDot(val) + '<span class="' + blendedClass(val) + '">$' + val.toFixed(4) + '</span>';
 }
 
 // ============================================================
@@ -1157,9 +1145,6 @@ function renderDailyTable() {
     return;
   }
 
-  // Derive dynamic $/record targets from PQL conversion rate
-  var dailyFilterMonths = {}; for (var di = 0; di < filtered.length; di++) { dailyFilterMonths[filtered[di].bm || getMonthKey(filtered[di].date)] = true; }
-  var dailyBTgt = deriveRecordTargets(Object.keys(dailyFilterMonths));
   // Compute monthly platform totals and rates for cost allocation (grouped by billing month)
   var monthTotals = {}; // { month: { lp:N, v:N, rm:N } }
   for (var i = 0; i < S.daily.length; i++) {
@@ -1213,7 +1198,7 @@ function renderDailyTable() {
     html += '<td class="rm-cell" style="text-align:right">' + (eScrub > 0 && rmRate > 0 ? '$' + rmRate.toFixed(4) : d) + '</td>';
     html += '<td class="sum-cell" style="text-align:right">' + (cleanRecs > 0 ? cleanRecs.toLocaleString() : d) + '</td>';
     html += '<td class="sum-cell" style="text-align:right">' + (totalCost > 0 ? fmt(totalCost) : d) + '</td>';
-    html += '<td class="sum-cell" style="text-align:right">' + fmtBlended(blended, dailyBTgt) + '</td>';
+    html += '<td class="sum-cell" style="text-align:right">' + fmtBlended(blended) + '</td>';
     html += '<td>' + (e.by || '—') + '</td>';
     html += '<td style="max-width:120px;font-size:10px;color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + (e.notes || '').replace(/"/g,'&quot;') + '">' + (e.notes || '—') + '</td>';
     html += '<td style="white-space:nowrap">' + (isAdmin ? '<button class="btn-edit" onclick="editDaily(' + e.id + ')" title="Edit">&#9998;</button> <button class="btn-x" onclick="rmDaily(' + e.id + ')" title="Delete">x</button>' : '') + '</td>';
@@ -1435,8 +1420,6 @@ function renderCampaignView() {
     mDaily = S.daily.filter(function(e) { return (e.bm || getMonthKey(e.date)) === selMonth; });
   }
 
-  var campFilterMonths = {}; for (var ci = 0; ci < mDaily.length; ci++) { campFilterMonths[mDaily[ci].bm || getMonthKey(mDaily[ci].date)] = true; }
-  var campBTgt = deriveRecordTargets(Object.keys(campFilterMonths));
   // Determine cost totals — for range, sum across relevant billing months
   var lpCostTotal = 0, vCostTotal = 0, rmCostTotal = 0;
   if (useRange) {
@@ -1581,7 +1564,7 @@ function renderCampaignView() {
       thtml += '<td class="rm-cell" style="text-align:right">' + (r[11] !== '—' ? r[11] : d) + '</td>';
       thtml += '<td class="sum-cell" style="text-align:right">' + (r[12] !== '—' ? r[12] : d) + '</td>';
       thtml += '<td class="sum-cell" style="text-align:right">' + (r[13] !== '—' ? r[13] : d) + '</td>';
-      thtml += '<td class="sum-cell" style="text-align:right">' + fmtBlended(r[14], campBTgt) + '</td>';
+      thtml += '<td class="sum-cell" style="text-align:right">' + fmtBlended(r[14]) + '</td>';
       thtml += '</tr>';
     }
     thtml += '</tbody></table></div>';
@@ -1988,10 +1971,7 @@ function renderOverview() {
     '<div class="kpi-card"><div class="kpi-label">Land Portal</div><div class="kpi-value">' + (lpR > 0 ? fmtK(lpR) + ' recs' : '—') + '</div><div class="kpi-sub">' + (lpCpr > 0 ? '$' + lpCpr.toFixed(4) + '/rec | ' + fmt(lpS) : 'No cost data') + '</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">Versium <span style="font-size:8px;color:#999">credit-based</span></div><div class="kpi-value">' + (vCreditsTotal > 0 ? fmtK(vCreditsTotal) + ' credits' : (vR > 0 ? fmtK(vR) + ' recs' : '—')) + '</div><div class="kpi-sub">' + (vCpr > 0 && vCreditsTotal > 0 ? '$' + vCpr.toFixed(4) + '/credit | ' + fmt(vCreditsTotal * vCpr) + ' allocated' : (vCpr > 0 && vR > 0 ? '$' + vCpr.toFixed(4) + '/credit | ' + fmt(vS) : 'No cost data')) + '</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">Readymode (Scrubbed)</div><div class="kpi-value">' + (rmR > 0 ? fmtK(rmR) + ' recs' : '—') + '</div><div class="kpi-sub">' + (rmCpr > 0 ? '$' + rmCpr.toFixed(4) + '/rec | ' + fmt(rmS) : 'No cost data') + '</div></div>' +
-    (function() {
-      var bTgt = deriveRecordTargets(months);
-      return '<div class="kpi-card"><div class="kpi-label">Blended $/Record</div><div class="kpi-value ' + blendedClass(blendedCpr, bTgt) + '">' + (blendedCpr > 0 ? blendedDot(blendedCpr, bTgt) + '$' + blendedCpr.toFixed(4) : '—') + '</div><div class="kpi-sub">' + (bTgt.rpp > 0 ? 'target: $' + bTgt.warn.toFixed(4) + '-$' + bTgt.target.toFixed(4) + ' | ' + Math.round(bTgt.rpp) + ' recs/PQL' : 'No PQL baseline') + '</div></div>';
-    })() +
+    '<div class="kpi-card"><div class="kpi-label">Blended $/Record</div><div class="kpi-value ' + blendedClass(blendedCpr) + '">' + (blendedCpr > 0 ? blendedDot(blendedCpr) + '$' + blendedCpr.toFixed(4) : '—') + '</div><div class="kpi-sub">target: $' + BLENDED_WARN.toFixed(4) + '-$' + BLENDED_TARGET.toFixed(4) + '</div></div>' +
     '<div class="kpi-card" style="cursor:pointer" onclick="var el=document.getElementById(\'overview-camp-expand\');if(el)el.style.display=el.style.display===\'none\'?\'block\':\'none\'"><div class="kpi-label">Campaigns <span style=\"font-size:9px;color:#888\">(click to expand)</span></div><div class="kpi-value">' + (campCount || DATA_CAMPAIGNS.length) + '</div><div class="kpi-sub">' + (campCount > 0 ? 'With recorded data' : 'From Command Center') + '</div></div>';
   var oldOvExp = document.getElementById('overview-camp-expand'); if (oldOvExp) oldOvExp.remove();
   var ovHtml = '<div id="overview-camp-expand" style="display:none;background:#f4f8f5;border-radius:6px;padding:10px 14px;margin-bottom:12px;border:1px solid #e0e0e0"><div style="font-size:11px;font-weight:600;color:#0f3d2e;margin-bottom:6px">Campaigns in ' + rangeTitle + ' (' + overviewCampList.length + ')</div><div style="display:flex;flex-wrap:wrap;gap:3px 14px;font-size:11px">';
