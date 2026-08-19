@@ -1158,7 +1158,8 @@ function renderDailyTable() {
     var rmAlloc = (mt.rm > 0 && eScrub > 0) ? (eScrub / mt.rm) * rmCost : 0;
     var totalCost = lpAlloc + vAlloc + rmAlloc;
     var cleanRecs = eClean;
-    var blended = cleanRecs > 0 ? totalCost / cleanRecs : 0;
+    var blendedDenom = cleanRecs > 0 ? cleanRecs : (eLp > 0 ? eLp : eV);
+    var blended = blendedDenom > 0 && totalCost > 0 ? totalCost / blendedDenom : 0;
 
     var d = '<span class="muted">—</span>';
     html += '<tr id="daily-row-' + e.id + '">';
@@ -1470,8 +1471,9 @@ function renderCampaignView() {
     // Clean records = total RM records loaded for this campaign
     var cleanRecs = cRecs['RmLoaded'] || 0;
 
-    // Blended $/rec
-    var blended = cleanRecs > 0 ? totalCost / cleanRecs : 0;
+    // Blended $/rec — fall back to LP or V records if no RM clean
+    var blendedDenom = cleanRecs > 0 ? cleanRecs : (lpR > 0 ? lpR : vR);
+    var blended = blendedDenom > 0 && totalCost > 0 ? totalCost / blendedDenom : 0;
 
     // Find campaign type and tier
     var campType = '—', campTier = '—';
@@ -1942,7 +1944,8 @@ function renderOverview() {
   }
   var rmCpr = rmR > 0 && rmS > 0 ? rmS / rmR : 0;
   var cleanRecs = totalRmLoaded;
-  var blendedCpr = cleanRecs > 0 && totalSpend > 0 ? totalSpend / cleanRecs : 0;
+  var blendedDenom = cleanRecs > 0 ? cleanRecs : (lpR > 0 ? lpR : vR);
+  var blendedCpr = blendedDenom > 0 && totalSpend > 0 ? totalSpend / blendedDenom : 0;
 
   $('kpis').innerHTML =
     '<div class="kpi-card"><div class="kpi-label">Total Spend (' + rangeTitle + ')</div><div class="kpi-value">' + fmt(totalSpend) + '</div><div class="kpi-sub">All platforms combined</div></div>' +
